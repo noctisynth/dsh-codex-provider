@@ -219,6 +219,12 @@ test('the shipped settings preserve account actions, host React sharing and styl
       .find((button) => button.props['aria-label'] === '网页搜索')
     assert.ok(search)
     assert.equal(search.props.role, 'combobox')
+    assert.ok(search.findAllByType('span').some((span) => span.children.includes('关闭')))
+    const sidebar = view.root
+      .findAllByType('button')
+      .find((button) => button.props['aria-label'] === '侧边栏账号')
+    assert.ok(sidebar)
+    assert.ok(sidebar.findAllByType('span').some((span) => span.children.includes('DeepSeek')))
     const button = view.root
       .findAllByType('button')
       .find((button) => button.props['aria-label'] === '使用 ChatGPT 登录')

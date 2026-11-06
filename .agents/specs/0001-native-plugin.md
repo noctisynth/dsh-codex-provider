@@ -64,6 +64,8 @@ Rust 按认证、请求及流式事件、绑定边界划分模块；按实际职
 
 UI 封装迁移至 Base UI 的 Button、Menu、Select 与 Switch，保持 React 18、宿主 React 共享及 Tailwind 前缀隔离；移除不再使用的直接 Radix 依赖。组件负责定位、选择、焦点与键盘行为，宿主模态框中的 Portal 仍归属于触发器所在弹窗。shadcn 派生样式的 MIT 许可放在组件目录并纳入包清单；使用 CLI 不改变许可保留义务。依据与验证见 EVIDENCE-025。
 
+设置 Select 从同一组选项提供 Root 的 items 值与标签映射，供 Value 渲染用户文案，不依赖弹出列表是否已挂载；实际保存值保持原配置契约。
+
 本次落地为默认关闭的 codexReview 和三档 searchMode，复用配置表单和紧凑 shadcn Button。审批关闭交给原 answerer；开启时在 approval/request 前置答复，仅生成当前请求的 allowed-once/rejected/cancelled/unavailable。使用会话当前 step、精确 call ID、工具参数与上下文形成独立审查请求；不把工具输出当作用户授权。原实验 Auto 模式不叠加第二次审批。账号轮换与取消继续复用已有模块，审查模型目录资料独立于普通模型列表。
 
 用户已决定暂时保留现有审批开关。选择原实验 Auto 的会话由宿主原有审查链路负责，本插件在生成审查上下文或请求模型前直接交给后续答复者；不把官方 Auto 请求重定向至专用 ChatGPT 审查模型，也不额外重复审查。

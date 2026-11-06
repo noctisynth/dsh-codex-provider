@@ -57,6 +57,7 @@ function SettingSelect({
   return (
     <Select
       value={value}
+      items={options.map(([value, label]) => ({ value, label }))}
       disabled={disabled}
       onValueChange={(next) => {
         if (next !== null) onChange(next)

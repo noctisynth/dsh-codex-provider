@@ -91,6 +91,7 @@
     "@deepseek-ai/dsh-working-directory": "0.2.2-rc.1",
     "@napi-rs/cli": "3.10.12",
     "@radix-ui/react-dropdown-menu": "^2.2.1",
+    "@radix-ui/react-select": "^2.4.1",
     "@radix-ui/react-slot": "^1.5.0",
     "@radix-ui/react-switch": "^1.4.1",
     "@tailwindcss/cli": "^4.3.4",

@@ -21,7 +21,7 @@ test('the shipped settings preserve account actions, host React sharing and styl
   runInNewContext(await readFile(new URL('../lib/client.js', import.meta.url), 'utf8'), {
     AbortController, Event, setTimeout, clearTimeout, HTMLFormElement: class {},
     document: { visibilityState: 'visible', addEventListener: documentEvents.addEventListener.bind(documentEvents), removeEventListener: documentEvents.removeEventListener.bind(documentEvents), createElement: () => style, head: { append(value: unknown) { assert.equal(value, style) } } },
-    window: { dispatchEvent: windowEvents.dispatchEvent.bind(windowEvents), addEventListener: windowEvents.addEventListener.bind(windowEvents), removeEventListener: windowEvents.removeEventListener.bind(windowEvents), __ModuleLoader__: { load(value: typeof loaded) { loaded = value } } },
+    window: { setTimeout, clearTimeout, dispatchEvent: windowEvents.dispatchEvent.bind(windowEvents), addEventListener: windowEvents.addEventListener.bind(windowEvents), removeEventListener: windowEvents.removeEventListener.bind(windowEvents), __ModuleLoader__: { load(value: typeof loaded) { loaded = value } } },
   })
   assert.ok(loaded)
   assert.equal(loaded.id, 'dsh-codex-provider')
@@ -97,7 +97,7 @@ test('the shipped settings preserve account actions, host React sharing and styl
     assert.equal(snapshot.value?.codexReview, true)
     const search = view.root.findAllByType('button').find(button => button.props['aria-label'] === '网页搜索')
     assert.ok(search)
-    assert.equal(search.props['aria-haspopup'], 'menu')
+    assert.equal(search.props.role, 'combobox')
     const button = view.root.findAllByType('button').find(button => button.props['aria-label'] === '使用 ChatGPT 登录')
     assert.ok(button)
     await act(async () => { await button.props.onClick() })

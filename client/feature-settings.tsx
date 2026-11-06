@@ -1,13 +1,11 @@
-import { useState, useSyncExternalStore, type ReactNode } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import type { ClientConnectionRpc } from '@deepseek-ai/dsh-client-connection/client'
 import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { SidebarPreference } from '../shared/sidebar-preference.ts'
 import type { PreferenceKey } from '../shared/features.ts'
 import { setPreference } from './preferences.ts'
-import { Button } from './ui/button.tsx'
 import { Switch } from './ui/switch.tsx'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from './ui/dropdown-menu.tsx'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select.tsx'
 
 function SettingRow({ title, description, error, children }: { title: string; description: string; error?: string; children: ReactNode }) {
   return <div className="cp:flex cp:items-center cp:justify-between cp:gap-6 cp:border-0 cp:border-b cp:border-solid cp:border-border cp:py-4 cp:last:border-b-0">
@@ -21,18 +19,18 @@ function SettingRow({ title, description, error, children }: { title: string; de
 }
 
 function SettingSelect({ label, value, options, disabled, onChange }: { label: string; value: string; options: readonly (readonly [string, string])[]; disabled: boolean; onChange(value: string): void }) {
-  return <DropdownMenu>
-    <DropdownMenuTrigger asChild>
-      <Button size="sm" variant="ghost" aria-label={label} disabled={disabled} className="cp:shrink-0 cp:gap-2 cp:font-normal">
-        {options.find(option => option[0] === value)?.[1]}<ChevronDown className="cp:size-3.5 cp:text-muted-foreground" />
-      </Button>
-    </DropdownMenuTrigger>
-    <DropdownMenuContent side="bottom" align="end" className="cp:min-w-40">
-      <DropdownMenuRadioGroup value={value} onValueChange={onChange}>
-        {options.map(([id, name]) => <DropdownMenuRadioItem key={id} value={id}>{name}</DropdownMenuRadioItem>)}
-      </DropdownMenuRadioGroup>
-    </DropdownMenuContent>
-  </DropdownMenu>
+  const [container, setContainer] = useState<HTMLElement | null>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  return <Select value={value} disabled={disabled} onValueChange={onChange} onOpenChange={open => {
+    if (open) setContainer(triggerRef.current?.closest<HTMLElement>('[role="dialog"], dialog') ?? null)
+  }}>
+    <SelectTrigger aria-label={label} ref={triggerRef}>
+      <SelectValue />
+    </SelectTrigger>
+    <SelectContent container={container}>
+      {options.map(([id, name]) => <SelectItem key={id} value={id}>{name}</SelectItem>)}
+    </SelectContent>
+  </Select>
 }
 
 export function FeatureSettings({ form, rpc }: { form: ConfigForm<SidebarPreference>; rpc: ClientConnectionRpc }) {

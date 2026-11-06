@@ -13,6 +13,7 @@ struct CatalogModel {
     display_name: String,
     visibility: String,
     context_window: Option<u32>,
+    input_modalities: Option<Vec<String>>,
     #[serde(default)]
     supported_reasoning_levels: Vec<ReasoningEffort>,
     default_reasoning_level: Option<String>,
@@ -36,6 +37,7 @@ pub(crate) struct Model {
     pub id: String,
     pub name: String,
     pub context_window: Option<u32>,
+    pub input_modalities: Option<Vec<String>>,
     pub reasoning: Option<Reasoning>,
 }
 
@@ -54,6 +56,7 @@ pub(crate) fn parse_catalog(json: &[u8]) -> Result<Vec<Model>, Error> {
                 id: model.slug,
                 name: model.display_name,
                 context_window: model.context_window,
+                input_modalities: model.input_modalities,
                 reasoning: if model.supported_reasoning_levels.is_empty() {
                     None
                 } else {
@@ -77,7 +80,7 @@ mod tests {
     fn visible_models_keep_server_order_and_context_capacity() -> Result<(), crate::error::Error> {
         let models = parse_catalog(
             br#"{"models":[
-            {"slug":"second","display_name":"Second","visibility":"list","context_window":272000,"max_context_window":872000},
+            {"slug":"second","display_name":"Second","visibility":"list","context_window":272000,"max_context_window":872000,"input_modalities":["text","image"]},
             {"slug":"hidden","display_name":"Hidden","visibility":"hidden"},
             {"slug":"first","display_name":"First","visibility":"list"}
         ]}"#,
@@ -89,12 +92,14 @@ mod tests {
                     id: "second".into(),
                     name: "Second".into(),
                     context_window: Some(272000),
+                    input_modalities: Some(vec!["text".into(), "image".into()]),
                     reasoning: None,
                 },
                 Model {
                     id: "first".into(),
                     name: "First".into(),
                     context_window: None,
+                    input_modalities: None,
                     reasoning: None,
                 },
             ]

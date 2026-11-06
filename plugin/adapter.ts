@@ -1,10 +1,12 @@
-import { LlmAdapter, ReasoningEffortId, projectImagesForTextModel, projectToolUpdates } from '@deepseek-ai/dsh-llm'
+import { LlmAdapter, ReasoningEffortId, projectToolUpdates } from '@deepseek-ai/dsh-llm'
 import { addAbortListener } from 'node:events'
 import native from '../index.cjs'
 import type { ChatGptClient } from '../index.cjs'
 import type { GenerateOptions, StreamChunk, LlmResolvedModelInfo } from '@deepseek-ai/dsh-llm'
 import type { Accounts } from './accounts.ts'
 import type { Operations } from './operations.ts'
+import type { AttachmentStore } from '@deepseek-ai/dsh-attachment'
+import { projectImages } from './images.ts'
 import { providerError } from './errors.ts'
 import type { NativeStreamChunk } from './errors.ts'
 
@@ -24,13 +26,15 @@ export class ChatGptAdapter extends LlmAdapter {
   client: ChatGptClient
   accounts: Accounts
   operations: Operations
+  private attachments?: Pick<AttachmentStore, 'readImage'>
   private catalog: Promise<LlmResolvedModelInfo[]> | undefined
 
-  constructor(client: ChatGptClient, accounts: Accounts, operations: Operations) {
+  constructor(client: ChatGptClient, accounts: Accounts, operations: Operations, attachments?: Pick<AttachmentStore, 'readImage'>) {
     super()
     this.client = client
     this.accounts = accounts
     this.operations = operations
+    this.attachments = attachments
   }
 
   providerInfo() {
@@ -76,8 +80,8 @@ export class ChatGptAdapter extends LlmAdapter {
     try {
       const record = await this.accounts.selected(operation.cancellation)
       return (await this.client.listModels(record, operation.cancellation))
-        .map(({ reasoning, contextWindow, ...model }) => ({
-          provider, ...model, inputModalities: ['text'] as const,
+        .map(({ reasoning, contextWindow, inputModalities, ...model }) => ({
+          provider, ...model, inputModalities: inputModalities?.includes('image') ? ['text', 'image'] as const : ['text'] as const,
           ...(contextWindow === undefined ? {} : { context: { contextWindow } }),
           ...(reasoning ? { reasoning: {
             efforts: reasoning.efforts.map(effort => ({
@@ -99,7 +103,7 @@ export class ChatGptAdapter extends LlmAdapter {
       const projected = projectToolUpdates(options.messages, options.tools, undefined, options.toolHistory)
       const request = {
         model: options.model,
-        messages: projectImagesForTextModel(projected.messages),
+        messages: await projectImages(projected.messages, this.attachments, options.signal),
         tools: projected.tools,
         system: options.system,
         reasoningEffort: options.reasoningEffort,

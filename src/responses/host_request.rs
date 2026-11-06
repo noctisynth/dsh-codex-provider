@@ -88,6 +88,15 @@ pub(crate) fn from_host(json: &str) -> Result<Request, Error> {
             }
             match block["type"].as_str() {
                 Some("text") => input.push(json!({"role":message.role,"content":text(block)})),
+                Some("image") if message.role == "user" => {
+                    let url = block["imageUrl"]
+                        .as_str()
+                        .filter(|url| !url.is_empty())
+                        .ok_or(Error::Protocol("DSH image omitted its resolved data URL"))?;
+                    input.push(json!({"role":"user","content":[{
+                        "type":"input_image", "image_url":url, "detail":"auto"
+                    }]}));
+                }
                 Some("tool-call") => input.push(json!({
                     "type":"function_call", "call_id":block["id"],
                     "name":block["name"], "arguments":block["arguments"]
@@ -127,6 +136,35 @@ pub(crate) fn from_host(json: &str) -> Result<Request, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn images_preserve_order_and_survive_followup_history() -> Result<(), Error> {
+        let request = from_host(
+            &json!({"model":"vision","messages":[
+                {"role":"user","content":[
+                    {"type":"text","text":"Compare"},
+                    {"type":"image","imageUrl":"data:image/png;base64,first"},
+                    {"type":"image","imageUrl":"data:image/jpeg;base64,second"}
+                ]},
+                {"role":"assistant","content":[{"type":"text","text":"Different colors"}]},
+                {"role":"user","content":[{"type":"text","text":"Which is red?"}]}
+            ]})
+            .to_string(),
+        )?;
+        assert_eq!(request.input.len(), 5);
+        assert_eq!(request.input[1]["content"][0]["type"], "input_image");
+        assert_eq!(
+            request.input[1]["content"][0]["image_url"],
+            "data:image/png;base64,first"
+        );
+        assert_eq!(
+            request.input[2]["content"][0]["image_url"],
+            "data:image/jpeg;base64,second"
+        );
+        assert_eq!(request.input[2]["content"][0]["detail"], "auto");
+        assert_eq!(request.input[4]["content"], "Which is red?");
+        Ok(())
+    }
 
     #[test]
     fn compaction_options_do_not_send_unsupported_siwc_parameters()

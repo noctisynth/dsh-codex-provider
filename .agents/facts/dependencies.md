@@ -18,6 +18,8 @@
 
 技术决策由 SPEC-001 维护，不在此复制实现进度。
 
+2026-11-07 核对：SIWC 允许模型支持的图片输入但不支持 Files 上传；Responses input_image 接受 data URL。DSH 0.2.2-rc.1 附件服务提供校验后的图片读取，宿主按模型能力执行文字占位，offloaded 表示持久卸载决定。来源与实测限制见 EVIDENCE-020。
+
 依据 EVIDENCE-010：目标公开模型目录提供 supported_reasoning_levels 与 default_reasoning_level；DSH 0.2.2-rc.1 通过精确模型解析的 reasoning 元数据提供档位选择和默认值校验。档位与默认值具有模型差异，不从型号猜测。
 
 依据 EVIDENCE-009 的流实验：目标公开模型可以在 output_item.done 中提供完整输出，同时在完成通知中返回空输出数组；不能只依赖终止通知恢复 stateless 历史。此为特定日期和请求下的观察。

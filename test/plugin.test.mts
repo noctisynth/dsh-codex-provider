@@ -13,6 +13,7 @@ test('Cordis mounts the authorization flow and provider, then releases both on d
     async readRecord() { return undefined }
   }
   const ctx = new Context()
+  ctx.provide('attachments', {} as never)
   const routes = new Set<string>()
   ctx.provide('connection', { fetch: { register(route) {
     routes.add(route.path)

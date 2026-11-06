@@ -9,7 +9,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-settings'
 
 export const name = 'codex-provider'
-export const inject = ['llm', 'credentials', 'authorization']
+export const inject = ['llm', 'credentials', 'authorization', 'attachments']
 export const Config = z.object({
   sidebarAccount: z.union(['deepseek', 'chatgpt']).default('deepseek').volatile(),
 })
@@ -28,7 +28,7 @@ export function apply(ctx: Context): void {
     methods: [{ id: 'oauth', label: '使用 ChatGPT 官方账号登录' }],
     run: session => accounts.authorize(session),
   }))
-  const adapter = new ChatGptAdapter(client, accounts, operations)
+  const adapter = new ChatGptAdapter(client, accounts, operations, ctx.attachments)
   ctx.on('credentials/record-updated', key => {
     if (key === accountsKey) adapter.invalidateCatalog()
   })

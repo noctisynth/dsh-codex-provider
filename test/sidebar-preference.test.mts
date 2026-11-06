@@ -28,6 +28,7 @@ test('sidebar preference persists through host settings without remounting autho
   let mounts = 0
   async function start() {
     const ctx = new Context()
+    ctx.provide('attachments', {} as never)
     ctx.provide('profileContext', profile)
     ctx.provide('credentials', { readRecord: async () => undefined } as unknown as Context['credentials'])
     ctx.provide('llm', { registerAdapter() {} } as unknown as Context['llm'])

@@ -28,3 +28,5 @@
 ## 身份资料补充
 
 2026-11-06 核对官方 Sign in with ChatGPT Quickstart：身份 scopes 可返回姓名、邮箱和头像。公开开源令牌参考将 OpenAI auth metadata 定义为不透明信息，未列出可用于展示的 Pro/Plus 套餐字段。当前采用经验证的标准 OIDC name、picture、email；使用邮箱作为账号次要信息，不从授权 scope 推断套餐。来源及实现证据见 EVIDENCE-013。
+
+同日真实授权诊断显示，profile scope 存在并不保证返回 picture。当前所测账号 ID token 有 name、无 picture；官方 discovery 声明的 UserInfo 接口成功返回匹配的 sub，但也无 picture。该结果只代表此次账号与授权，不能推广为所有账号均不支持头像。依据 EVIDENCE-014。

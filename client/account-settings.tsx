@@ -189,38 +189,55 @@ export function AccountSettings({
         </div>
       )}
       {running && (
-        <div className="cp:mt-5 cp:rounded-xl cp:bg-muted/50 cp:p-4">
+        <div className="cp:mt-6 cp:border-0 cp:border-t cp:border-solid cp:border-border cp:pt-5">
           <div role="status" className="cp:flex cp:items-start cp:gap-3">
-            <LoaderCircle
-              aria-hidden="true"
-              className="cp:mt-1 cp:size-4 cp:shrink-0 cp:animate-spin cp:motion-reduce:animate-none"
-            />
+            {!status?.login.prompt && (
+              <LoaderCircle
+                aria-hidden="true"
+                className="cp:mt-1 cp:size-4 cp:shrink-0 cp:animate-spin cp:motion-reduce:animate-none"
+              />
+            )}
             <div>
               <div className="cp:font-medium">
-                {status?.login.prompt ? "选择登录账号" : "等待浏览器授权"}
+                {status?.login.prompt
+                  ? status.login.prompt.options.some((option) => option.id === "add")
+                    ? "选择登录方式"
+                    : status.login.prompt.message
+                  : "等待浏览器授权"}
               </div>
               <p className="cp:mt-1 cp:mb-0 cp:text-xs cp:text-muted-foreground">
                 {status?.login.prompt
-                  ? "选择已有账号，或添加一个新账号。"
+                  ? "重新授权已有账号，或连接其他账号。"
                   : "完成授权后，这里会自动更新。"}
               </p>
             </div>
           </div>
           {status?.login.prompt && (
-            <div className="cp:mt-4 cp:space-y-2">
-              {status.login.prompt.options.map((option) => (
-                <Button
-                  key={option.id}
-                  size="sm"
-                  variant="outline"
-                  className="cp:h-auto cp:w-full cp:justify-between cp:py-2 cp:text-left cp:whitespace-normal"
-                  disabled={busy}
-                  onClick={() => act("answer", { id: option.id })}
-                >
-                  {option.label}
-                  <ArrowRight aria-hidden="true" />
-                </Button>
-              ))}
+            <div className="cp:mt-3 cp:space-y-1">
+              {status.login.prompt.options.map((option) => {
+                const account = accounts.find((account) => account.clientId === option.id);
+                const label = account
+                  ? `重新登录 ${account.name || account.email || "此账号"}`
+                  : option.id === "add"
+                    ? "添加新账号"
+                    : option.label;
+                return (
+                  <Button
+                    key={option.id}
+                    size="sm"
+                    variant="ghost"
+                    className="cp:group cp:h-auto cp:w-full cp:justify-between cp:gap-4 cp:px-3 cp:py-3 cp:text-left cp:whitespace-normal"
+                    disabled={busy}
+                    onClick={() => act("answer", { id: option.id })}
+                  >
+                    <span className="cp:min-w-0 cp:break-words">{label}</span>
+                    <ArrowRight
+                      aria-hidden="true"
+                      className="cp:transition-transform cp:duration-150 cp:group-hover:translate-x-1 cp:group-focus-visible:translate-x-1 cp:motion-reduce:transition-none cp:motion-reduce:transform-none"
+                    />
+                  </Button>
+                );
+              })}
             </div>
           )}
           <Button

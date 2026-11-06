@@ -22,10 +22,10 @@
     "targets": ["x86_64-pc-windows-msvc"]
   },
   "peerDependencies": {
-    "@deepseek-ai/cordis": "~4.0.5",
-    "@deepseek-ai/dsh-authorization": "0.2.1-rc.2",
-    "@deepseek-ai/dsh-credentials": "0.2.1-rc.2",
-    "@deepseek-ai/dsh-llm": "0.2.1-rc.2"
+    "@deepseek-ai/cordis": "~4.1.0",
+    "@deepseek-ai/dsh-authorization": "0.2.2-rc.1",
+    "@deepseek-ai/dsh-credentials": "0.2.2-rc.1",
+    "@deepseek-ai/dsh-llm": "0.2.2-rc.1"
   },
   "dependencies": { "open": "^10.2.0" },
   "devDependencies": { "@napi-rs/cli": "3.10.12" }

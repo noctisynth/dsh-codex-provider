@@ -24,6 +24,8 @@ Rust 与 napi-rs 保留可选 context_window，适配层映射为 DSH 的 contex
 
 宿主适配层为已支持 reasoning effort 提供可读 name，采用当前 Codex 简体中文显示文案；id、有效 defaultEffort、服务端顺序和 description 不变。未知档位保留原名称，不添加目录之外的选项，不替换宿主模型选择器。映射与实际宿主消费方式见 EVIDENCE-010；Ultra 排除依据 EVIDENCE-016。
 
+Fast 使用公开 Responses 的 service_tier，与 reasoning.effort 分开。通过真实档位验证后，拟沿用宿主 Config/configForms 保存默认关闭的布尔开关，每次请求读取 volatile 配置，影响后续请求而不打断当前流；无需新的凭据或持久化服务。当前公开请求验证未满足实际 Fast 生效条件，暂不实施开关；结果及适用边界见 EVIDENCE-017，后续处理待用户决定。
+
 手写宿主适配和浏览器代码使用 TypeScript。tsdown 基于 Rolldown/Oxc 构建宿主 ESM 与浏览器标准 closure factory，React 由宿主提供；Oxc 的 tsrs 通过 tsconfig 检查类型。此适配仅声明宿主要求的模块入口，不实现新的浏览器模块加载器。原生构建继续完全由 napi-rs 管理。tsrs 为实验性工具，实际兼容结果由证据记录，遇到阻碍时说明，不静默替换编译器。
 
 界面重设计采用 React 与 TypeScript，保持宿主 React 运行时共享。按实际使用引入 shadcn/ui 组件，采用 Tailwind utilities；关闭插件侧 Preflight，避免重置宿主元素，使用插件专属前缀隔离工具类。颜色和字体优先映射 DSH 主题，不引入独立主题开关。仅保留 Tailwind 构建指令、必要主题映射及宿主样式装载所需的最小 CSS。组件版本与 React 18 的兼容性、Tailwind 产物的加载和样式边界须在实现时验证。

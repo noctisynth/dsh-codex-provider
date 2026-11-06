@@ -1,6 +1,6 @@
 # SIWC Fast 模式调研
 
-编号：EVIDENCE-017。日期：2026-11-06。范围：官方公开文档与当前插件静态核对，未使用账号令牌或发送推理请求。
+编号：EVIDENCE-017。日期：2026-11-06。范围：官方公开文档、当前插件静态核对及用户随后授权的真实合成推理验证。
 
 ## 官方资料
 
@@ -14,6 +14,25 @@ SIWC 开源令牌推理页要求公开 Responses、store=false 和 stream=true�
 
 ## 项目状态与结论
 
-当前 Rust 请求类型和宿主适配未包含 service_tier，也没有速度开关。Fast 尚未接入；若纳入需求，应先用明确的合成请求核对实际完成及返回档位，再确定模型与账号支持边界，不以降低推理强度模拟 Fast。此次询问不是新增功能的实施授权。
+初次调研时 Rust 请求类型和宿主适配未包含 service_tier，也没有速度开关。用户随后明确要求验证后加入开关；以下记录真实验证结果，不以降低推理强度模拟 Fast。
 
 附带静态观察：当前可选 maxTokens、temperature 会映射为 max_output_tokens、temperature，而同日 SIWC 限制页将这两个字段列为不支持。仅字段存在时才会发送；本次没有触发对应请求，不能将该潜在兼容问题写成已复现故障。这是需要后续核对的协议差异。
+
+## 真实 SIWC 请求验证
+
+使用当前 DSH 活动账号尚有效的 SIWC access token，仅发送要求简短回复的合成输入，未读取或发送私人会话，未刷新或写入凭据。请求使用公开 Responses、宿主 attribution headers、store=false、stream=true 和 reasoning.effort=low。分别核对完整流中的终止事件及原始 response.service_tier，不通过耗时推断速度档位。
+
+| 模型 | 请求 service_tier | HTTP 与终止结果 | 实际返回档位或错误 |
+|---|---|---|---|
+| gpt-6.1-sol | default | 200，response.completed | default |
+| gpt-6.1-sol | fast | 400 | detail: Unsupported service_tier: fast |
+| gpt-6.1-sol | priority | 200，response.completed | default |
+| gpt-6-astra | default | 200，response.completed | default |
+| gpt-6-astra | fast | 400 | detail: Unsupported service_tier: fast |
+| gpt-6-astra | priority | 200，response.completed | default |
+
+fast 的第一次诊断仅查看标准 error 对象，未取得说明；随后读取实际顶层 detail，两个模型均重复出现相同的拒绝。共八次短请求，四次完成、四次拒绝。未记录令牌、账号资料、响应标识或正文。
+
+官方通用 API 文档允许 fast 或 priority，并要求以响应档位判断实际处理方式；部分文档对返回 fast 还是 priority 的描述存在版本范围差异，但两者都不等于本次返回的 default。来源：https://developers.openai.com/api/reference/typescript/resources/responses 、https://developers.openai.com/api/docs/guides/fast-mode 。未找到 SIWC 需要额外速度参数的公开说明。
+
+观察结论：本次账号、授权与两个模型组合没有实际获得 Fast；priority 请求成功不能视为 Fast 成功。尚不能区分服务端 SIWC 限制、账号资格或其他服务端降档因素，也不能推广为所有 SIWC 账号永久不支持。当前不足以交付有效开关；按用户既有要求停止依赖该能力的实现并询问后续方向。未改产品代码、未构建或替换安装包。

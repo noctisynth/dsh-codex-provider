@@ -4,7 +4,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio_util::sync::CancellationToken;
 
-use crate::{auth::Session, error::Error, transport::Transport};
+use crate::{
+    auth::Session,
+    error::{ApiError, Error},
+    transport::Transport,
+};
 
 mod host_events;
 mod host_request;
@@ -20,10 +24,6 @@ pub(crate) struct Request {
     tools: Option<Vec<Value>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     reasoning: Option<Value>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    max_output_tokens: Option<u32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    temperature: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     include: Option<Vec<String>>,
 }
@@ -44,6 +44,9 @@ pub(crate) fn stream(
 ) -> BoxStream<'static, Result<Value, Error>> {
     Box::pin(async_stream::try_stream! {
         if cancel.is_cancelled() { Err(Error::Cancelled)?; }
+        if !session.scopes.iter().any(|scope| scope == "chatgpt.tokens.use.direct") {
+            Err(Error::Auth("ChatGPT plan usage was not authorized"))?;
+        }
         let response = tokio::select! {
             _ = cancel.cancelled() => Err(Error::Cancelled),
             response = transport.response(&session.access_token, &request) => response,
@@ -73,9 +76,9 @@ fn decode(
                 .map_err(|_| Error::Protocol("Invalid OpenAI event JSON"))?;
             let event_type = value["type"].as_str().ok_or(Error::Protocol("OpenAI event omitted its type"))?;
             match event_type {
-                "response.failed" => Err(Error::ResponseFailed(value["response"]["error"]["code"].as_str().unwrap_or("unknown_error").into()))?,
+                "response.failed" => Err(Error::Api(ApiError::from_value(&value["response"]["error"])))?,
                 "response.incomplete" => Err(Error::Incomplete(value["response"]["incomplete_details"]["reason"].as_str().unwrap_or("unknown_reason").into()))?,
-                "error" => Err(Error::ResponseFailed(value["code"].as_str().unwrap_or("unknown_error").into()))?,
+                "error" => Err(Error::Api(ApiError::from_value(&value)))?,
                 "response.completed" => { yield value; break; }
                 _ => yield value,
             }
@@ -143,13 +146,34 @@ mod tests {
         let failed = decode(source(&[r#"{"type":"response.failed","response":{"error":{"code":"subscription_sharing_usage_limit_exceeded"}}}"#]), CancellationToken::new())
             .try_collect::<Vec<_>>().await;
         assert!(
-            matches!(failed, Err(Error::ResponseFailed(code)) if code == "subscription_sharing_usage_limit_exceeded")
+            matches!(failed, Err(Error::Api(detail)) if detail.code.as_deref() == Some("subscription_sharing_usage_limit_exceeded"))
         );
         let incomplete = decode(source(&[r#"{"type":"response.incomplete","response":{"incomplete_details":{"reason":"max_output_tokens"}}}"#]), CancellationToken::new())
             .try_collect::<Vec<_>>().await;
         assert!(
             matches!(incomplete, Err(Error::Incomplete(reason)) if reason == "max_output_tokens")
         );
+    }
+
+    #[tokio::test]
+    async fn stream_error_retains_public_diagnostics_without_payload()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let result = decode(source(&[
+            r#"{"type":"error","code":"context_length_exceeded","param":"input","message":"Context exceeded","input":"not-for-display"}"#,
+        ]), CancellationToken::new()).try_collect::<Vec<_>>().await;
+        let error = match result {
+            Err(error) => error,
+            Ok(_) => return Err("the synthetic stream must fail".into()),
+        };
+        let event = error.stream_event();
+        assert_eq!(event["error"]["code"], "context_length_exceeded");
+        assert_eq!(event["error"]["param"], "input");
+        assert_eq!(
+            event["error"]["message"],
+            "OpenAI response failed: Context exceeded"
+        );
+        assert!(event["error"].get("input").is_none());
+        Ok(())
     }
 
     #[tokio::test]

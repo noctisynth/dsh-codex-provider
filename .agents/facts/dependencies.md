@@ -1,6 +1,6 @@
 # 依赖与协议事实
 
-编号：FACT-002。更新：2026-11-06。证据：EVIDENCE-002、EVIDENCE-003、EVIDENCE-004。
+编号：FACT-002。更新：2026-11-07。证据：EVIDENCE-002、EVIDENCE-003、EVIDENCE-004；补充来源随事实列出。
 
 | 事实 | 适用限制 |
 |---|---|
@@ -39,4 +39,4 @@ Gravatar 官方图片服务按规范化邮箱的 SHA-256 定位头像，支持�
 
 2026-11-06，SIWC 官方界面规范包含 Fast 示例；当前账号目录对所测两个模型均声明 priority/Fast。真实合成请求拒绝 fast 字面值，priority 完成但响应字段为 default。第一方 Codex 官方反馈说明其回显不一定反映 Fast 路由，该解释尚不能直接推广到 SIWC；当前无法只凭该字段确定加速是否生效。依据 EVIDENCE-017。
 
-同日核对 SIWC 公开限制：max_output_tokens 与 temperature 不受支持；错误响应可为顶层 detail；终止刷新错误需清理不可用令牌并保留注册身份。DSH 0.2.2-rc.1 的摘要压缩会传 maxTokens，失败后压缩依赖 CONTEXT_WINDOW_EXCEEDED 分类；本项目当前映射不完整。依据 EVIDENCE-018。
+2026-11-07 复核 SIWC 公开限制：max_output_tokens 与 temperature 不受支持；错误响应可为顶层 detail；终止刷新错误需清理不可用令牌并保留注册身份。DSH 0.2.2-rc.1 的摘要压缩会传 maxTokens，失败后压缩依赖 CONTEXT_WINDOW_EXCEEDED 分类。依据 EVIDENCE-018、EVIDENCE-019；实现状态由 TODO-001 维护。

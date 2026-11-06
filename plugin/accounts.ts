@@ -82,6 +82,7 @@ export class Accounts {
 
   async selected(cancellation: Cancellation): Promise<string> {
     let selected = ''
+    let signedOut = false
     await this.credentials.modifyRecord(accountsKey, async (current) => {
       const vault = requiredVault(current)
       const record = vault.accounts.find(record => native.describeSession(record).clientId === vault.active)
@@ -90,11 +91,14 @@ export class Accounts {
       }
       const renewed = await this.client.renewSession(record, cancellation)
       selected = renewed.record
+      signedOut = !renewed.account.hasCredentials
       if (selected === record) return undefined
       return { kind: 'grant', payload: {
         ...vault, accounts: vault.accounts.map(value => value === record ? selected : value),
       } }
     })
+    // A terminal refresh failure must commit its cleared tokens before reporting failure.
+    if (signedOut) throw new LlmError('ChatGPT 登录已失效，请在设置 → ChatGPT 中重新登录。', 'INVALID_CREDENTIAL')
     return selected
   }
 

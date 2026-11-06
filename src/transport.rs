@@ -1,5 +1,5 @@
 use crate::{
-    error::Error,
+    error::{ApiError, Error},
     models::{self, Model},
 };
 
@@ -70,32 +70,42 @@ impl Transport {
     }
 }
 
-#[derive(serde::Deserialize)]
-struct ApiErrorResponse {
-    error: ApiErrorDetail,
-}
-
-#[derive(serde::Deserialize)]
-struct ApiErrorDetail {
-    message: String,
-}
-
 async fn response_error(response: reqwest::Response) -> Error {
     let status = response.status().as_u16();
+    let request_id = response
+        .headers()
+        .get("x-request-id")
+        .and_then(|value| value.to_str().ok())
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned);
     match response.bytes().await {
-        Ok(body) => parse_api_error(status, &body),
-        Err(_) => Error::Http(status),
+        Ok(body) => parse_api_error(status, &body, request_id),
+        Err(_) => Error::Api(ApiError {
+            status: Some(status),
+            request_id,
+            ..ApiError::default()
+        }),
     }
 }
 
-fn parse_api_error(status: u16, body: &[u8]) -> Error {
-    match serde_json::from_slice::<ApiErrorResponse>(body) {
-        Ok(response) if !response.error.message.trim().is_empty() => Error::Api {
-            status,
-            message: response.error.message,
-        },
-        _ => Error::Http(status),
+fn parse_api_error(status: u16, body: &[u8], request_id: Option<String>) -> Error {
+    let mut detail = ApiError {
+        status: Some(status),
+        request_id,
+        ..ApiError::default()
+    };
+    if let Ok(value) = serde_json::from_slice::<serde_json::Value>(body) {
+        let parsed = ApiError::from_value(&value["error"]);
+        detail.code = parsed.code;
+        detail.param = parsed.param;
+        detail.message = parsed.message.or_else(|| {
+            value["detail"]
+                .as_str()
+                .filter(|message| !message.trim().is_empty())
+                .map(str::to_owned)
+        });
     }
+    Error::Api(detail)
 }
 
 #[cfg(test)]
@@ -107,11 +117,32 @@ mod tests {
         let error = parse_api_error(
             400,
             br#"{"error":{"message":"Invalid reasoning.effort: ultra","type":"invalid_request_error","code":"invalid_value","param":"reasoning.effort"},"extra":"not for display"}"#,
+            Some("req-test".into()),
         );
         assert_eq!(
             error.to_string(),
             "OpenAI returned HTTP 400: Invalid reasoning.effort: ultra"
         );
+        let event = error.stream_event();
+        assert_eq!(event["error"]["status"], 400);
+        assert_eq!(event["error"]["code"], "invalid_value");
+        assert_eq!(event["error"]["param"], "reasoning.effort");
+        assert_eq!(event["error"]["requestId"], "req-test");
+        assert!(event["error"].get("extra").is_none());
+    }
+
+    #[test]
+    fn direct_admission_detail_is_preserved_without_inventing_a_code() {
+        let error = parse_api_error(
+            400,
+            br#"{"detail":"Unsupported service_tier: fast","extra":"private"}"#,
+            None,
+        );
+        assert_eq!(
+            error.to_string(),
+            "OpenAI returned HTTP 400: Unsupported service_tier: fast"
+        );
+        assert!(error.stream_event()["error"].get("code").is_none());
     }
 
     #[test]
@@ -122,7 +153,7 @@ mod tests {
             br#"{"error":{"message":" "}}"#,
         ] {
             assert_eq!(
-                parse_api_error(503, body).to_string(),
+                parse_api_error(503, body, None).to_string(),
                 "OpenAI returned HTTP 503"
             );
         }

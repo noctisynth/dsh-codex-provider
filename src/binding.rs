@@ -237,13 +237,6 @@ impl ChatGptClient {
         cancellation: &Cancellation,
     ) -> napi::Result<ReadableStream<'env, serde_json::Value>> {
         let session = auth::Session::decode(&record)?;
-        if !session
-            .scopes
-            .iter()
-            .any(|scope| scope == "chatgpt.tokens.use.direct")
-        {
-            return Err(Error::Auth("ChatGPT plan usage was not authorized").into());
-        }
         let request = responses::from_host(&request_json)?;
         let events = responses::stream(
             self.transport.clone(),
@@ -251,7 +244,11 @@ impl ChatGptClient {
             request,
             cancellation.token.child_token(),
         )
-        .map(|event| event.map_err(napi::Error::from));
+        .map(|event| match event {
+            Err(Error::Cancelled) => Err(Error::Cancelled.into()),
+            Err(error) => Ok(error.stream_event()),
+            Ok(chunk) => Ok(chunk),
+        });
         ReadableStream::new(env, Box::pin(events))
     }
 
@@ -290,7 +287,8 @@ impl ChatGptClient {
         })
     }
 
-    /// Call inside DSH modifyRecord; persist the returned record before using it.
+    /// Persist the returned record inside DSH modifyRecord, including cleared tokens after
+    /// terminal refresh failure. Only use it when account.hasCredentials remains true.
     #[napi]
     pub async fn renew_session(
         &self,

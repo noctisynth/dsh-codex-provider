@@ -5,6 +5,8 @@ import type { ChatGptClient } from '../index.cjs'
 import type { GenerateOptions, StreamChunk, LlmResolvedModelInfo } from '@deepseek-ai/dsh-llm'
 import type { Accounts } from './accounts.ts'
 import type { Operations } from './operations.ts'
+import { providerError } from './errors.ts'
+import type { NativeStreamChunk } from './errors.ts'
 
 export const provider = 'openai-codex'
 
@@ -91,7 +93,7 @@ export class ChatGptAdapter extends LlmAdapter {
 
   async *stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
     const operation = this.operations.start(options.signal)
-    let reader: ReadableStreamDefaultReader<StreamChunk> | undefined
+    let reader: ReadableStreamDefaultReader<NativeStreamChunk> | undefined
     try {
       const record = await this.accounts.selected(operation.cancellation)
       const projected = projectToolUpdates(options.messages, options.tools, undefined, options.toolHistory)
@@ -101,13 +103,12 @@ export class ChatGptAdapter extends LlmAdapter {
         tools: projected.tools,
         system: options.system,
         reasoningEffort: options.reasoningEffort,
-        temperature: options.temperature,
-        maxTokens: options.maxTokens,
       }
       reader = this.client.streamResponse(record, JSON.stringify(request), operation.cancellation).getReader()
       for (;;) {
         const { done, value } = await reader.read()
         if (done) break
+        if (value.type === 'provider-error') throw providerError(value)
         yield value
       }
     } finally {

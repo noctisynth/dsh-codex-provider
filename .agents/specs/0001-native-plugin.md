@@ -1,6 +1,6 @@
 # Rust 原生插件技术方案
 
-编号：SPEC-001。依据：RFC-001。状态：核心主链路已有实测，异常恢复与发布尚待完善。更新：2026-11-06。事实：FACT-002；证据：EVIDENCE-002、EVIDENCE-007、EVIDENCE-018。
+编号：SPEC-001。依据：RFC-001。状态：核心主链路及已确认异常恢复已有验证，发布验收尚未完成。更新：2026-11-07。事实：FACT-002；证据：EVIDENCE-002、EVIDENCE-007、EVIDENCE-019。
 
 ## 组件职责
 
@@ -20,13 +20,17 @@
 
 Rust 解析目录中的 supported_reasoning_levels 和 default_reasoning_level，通过 napi-rs 传给宿主。过滤当前不支持的 Codex Ultra 组合模式，并省略指向 Ultra 的默认档位；保留其余服务端顺序和值，不自行补充 Max。适配器在精确模型解析中提供 DSH 的 reasoning 元数据，缺少可选档位时不猜测能力。使用同一个目录缓存，取消精确解析不取消其他调用共享的目录请求。请求继续映射宿主 reasoningEffort 到 Responses 的 reasoning.effort；已保存的 Ultra 选择交由宿主能力校验拒绝，用户重新选择支持档位，不自动替换。
 
-Rust 与 napi-rs 保留可选 context_window，适配层映射为 DSH 的 context.contextWindow。该值表示请求与响应的总容量；不使用 max_context_window 扩大当前容量，不重复扣除宿主自身的输出预算与余量。缺少字段时不猜测。公开 HTTP 错误解析标准 error.message 并连同状态码返回；非标准响应保留状态码，不显示整份响应体或凭据。依据 EVIDENCE-016。
+Rust 与 napi-rs 保留可选 context_window，适配层映射为 DSH 的 context.contextWindow。该值表示请求与响应的总容量；不使用 max_context_window 扩大当前容量，不重复扣除宿主自身的输出预算与余量。缺少字段时不猜测。容量依据 EVIDENCE-016，错误诊断契约见下文。
 
 宿主适配层为已支持 reasoning effort 提供可读 name，采用当前 Codex 简体中文显示文案；id、有效 defaultEffort、服务端顺序和 description 不变。未知档位保留原名称，不添加目录之外的选项，不替换宿主模型选择器。映射与实际宿主消费方式见 EVIDENCE-010；Ultra 排除依据 EVIDENCE-016。
 
 Fast 使用公开 Responses 的 service_tier，与 reasoning.effort 分开。完成适用性验证后，拟沿用宿主 Config/configForms 保存默认关闭的布尔开关，每次请求读取 volatile 配置，影响后续请求而不打断当前流；无需新的凭据或持久化服务。请求值应采用账号目录声明的档位 ID，不能把界面 Fast 名称直接当作请求值。用户已授权继续调研，当前尚未实施开关；公开契约、目录与回显边界见 EVIDENCE-017。
 
-待修复的核心适配集中在三条边界：原生请求转换不发送 SIWC 不支持的 max_output_tokens 和 temperature，仍复用 DSH 的压缩与预算；原生错误保留状态、机器码和允许展示的 message/detail，宿主层映射为已有上下文、额度与认证分类；刷新区分终止授权错误和临时失败，由既有凭据事务保存清除无效令牌后的记录并保留注册身份。以上为待落实的修复职责，不新建重试框架或凭据存储；缺口依据 EVIDENCE-018，完成状态由 TODO-001 维护。
+原生请求与宿主转换不发送 SIWC 不支持的 max_output_tokens 和 temperature；DSH 继续负责压缩时机、摘要和预算，不新增压缩实现。
+
+HTTP 错误仅保留状态、标准 error.message/code/param、公开顶层 detail 和请求标识；SSE 失败保留事件中的 message/code/param，不展示整份响应体。原生对象流以内部终止错误事件跨 napi 边界传递这些信息，TS 错误模块将其转换为 DSH LlmError，不将该内部事件交给宿主。按机器码及状态映射上下文、额度、认证、限流、服务端和传输失败，不解析展示文案猜测分类；上下文恢复沿用 DSH 中间件，取消仍遵循既有 AbortSignal 与原生取消路径。
+
+刷新使用 OAuth 库的错误码与实际 HTTP 状态区分终止授权失败。明确终止的 4xx 清除不可用令牌并保留注册身份，以既有 LoginResult 返回；宿主先提交凭据事务，再拒绝当前请求并提示重新登录。后续请求不再刷新已清空的令牌。未知、网络、5xx 和其他临时失败保留原记录；提交失败不报告清理成功。不增加返回协议、重试框架或凭据存储。原生及 DSH 集成验证见 EVIDENCE-019。
 
 手写宿主适配和浏览器代码使用 TypeScript。tsdown 基于 Rolldown/Oxc 构建宿主 ESM 与浏览器标准 closure factory，React 由宿主提供；Oxc 的 tsrs 通过 tsconfig 检查类型。此适配仅声明宿主要求的模块入口，不实现新的浏览器模块加载器。原生构建继续完全由 napi-rs 管理。tsrs 为实验性工具，实际兼容结果由证据记录，遇到阻碍时说明，不静默替换编译器。
 

@@ -14,8 +14,6 @@ struct GenerateOptions {
     system: Option<String>,
     tools: Option<Vec<Tool>>,
     reasoning_effort: Option<String>,
-    max_tokens: Option<u32>,
-    temperature: Option<f64>,
 }
 
 #[derive(Deserialize)]
@@ -122,8 +120,6 @@ pub(crate) fn from_host(json: &str) -> Result<Request, Error> {
             Some(effort) => json!({"summary":"auto","effort":effort}),
             None => json!({"summary":"auto"}),
         }),
-        max_output_tokens: options.max_tokens,
-        temperature: options.temperature,
         include: None,
     })
 }
@@ -131,6 +127,31 @@ pub(crate) fn from_host(json: &str) -> Result<Request, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn compaction_options_do_not_send_unsupported_siwc_parameters()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let request = from_host(
+            &json!({
+                "model": "test", "system": "Summarize the conversation.",
+                "messages": [{"role":"user","content":[{"type":"text","text":"Keep the task goal."}]}],
+                "maxTokens": 65536, "temperature": 0.2, "reasoningEffort": "low"
+            }).to_string(),
+        )?;
+        let wire = serde_json::to_value(super::super::StreamingRequest {
+            request: &request,
+            store: false,
+            stream: true,
+        })?;
+        assert!(wire.get("max_output_tokens").is_none());
+        assert!(wire.get("temperature").is_none());
+        assert_eq!(wire["instructions"], "Summarize the conversation.");
+        assert_eq!(wire["input"][0]["content"], "Keep the task goal.");
+        assert_eq!(wire["reasoning"]["effort"], "low");
+        assert_eq!(wire["store"], false);
+        assert_eq!(wire["stream"], true);
+        Ok(())
+    }
 
     #[test]
     fn selected_effort_is_sent_to_responses_without_an_invented_default() -> Result<(), Error> {

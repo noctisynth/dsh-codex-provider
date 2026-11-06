@@ -15,8 +15,14 @@ test('native object stream rejects a cancelled read without inference', async ()
   reader.releaseLock()
 })
 
-test('missing ChatGPT plan permission is rejected before creating an inference stream', () => {
+test('missing ChatGPT plan permission emits one classified failure without inference', async () => {
   const record = JSON.parse(sessionRecord())
   record.scopes = ['openid']
-  assert.throws(() => new ChatGptClient({}).streamResponse(JSON.stringify(record), request, new Cancellation()), /not authorized/)
+  const reader = new ChatGptClient({}).streamResponse(JSON.stringify(record), request, new Cancellation()).getReader()
+  const first = await reader.read()
+  assert.equal(first.value.type, 'provider-error')
+  assert.equal(first.value.error.kind, 'auth')
+  assert.match(first.value.error.message, /not authorized/)
+  assert.equal((await reader.read()).done, true)
+  reader.releaseLock()
 })

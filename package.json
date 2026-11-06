@@ -74,6 +74,7 @@
     "@deepseek-ai/dsh-client-ui-settings": "0.2.2-rc.1",
     "@deepseek-ai/dsh-client-ui-slots": "0.2.2-rc.1",
     "@deepseek-ai/dsh-config-editor": "0.2.2-rc.1",
+    "@deepseek-ai/dsh-credentials-local": "0.2.2-rc.1",
     "@deepseek-ai/dsh-settings": "0.2.2-rc.1",
     "@napi-rs/cli": "3.10.12",
     "@radix-ui/react-dropdown-menu": "^2.2.1",

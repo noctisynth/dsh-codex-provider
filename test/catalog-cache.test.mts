@@ -15,7 +15,7 @@ test('catalog metadata supplies capacity and efforts and shares reads across loo
   const account = describeSession(record)
   let stored: CredentialRecord = {
     kind: 'grant',
-    payload: { hostId: 'fixture', active: account.clientId, accounts: [record] },
+    payload: { hostId: 'fixture', active: account.id, accounts: [record] },
   }
   class Credentials extends Service {
     constructor(ctx: Context) {

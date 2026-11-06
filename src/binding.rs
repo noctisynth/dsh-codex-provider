@@ -36,6 +36,7 @@ impl Cancellation {
 #[napi]
 pub struct LoginAttempt {
     url: Mutex<String>,
+    user_code: Option<String>,
     pending: Mutex<Option<auth::PendingLogin>>,
     cancel: CancellationToken,
 }
@@ -48,6 +49,10 @@ impl Drop for LoginAttempt {
 
 #[napi]
 impl LoginAttempt {
+    #[napi(getter)]
+    pub fn user_code(&self) -> Option<String> {
+        self.user_code.clone()
+    }
     #[napi(getter)]
     pub fn can_retry(&self) -> napi::Result<bool> {
         Ok(self
@@ -106,7 +111,7 @@ impl LoginAttempt {
             .take()
             .ok_or(Error::Auth("ChatGPT sign-in cannot be retried"))?;
         let pending = pending.restart(self.cancel.child_token()).await?;
-        let url = pending.url.clone();
+        let url = pending.url().to_owned();
         *self
             .url
             .lock()
@@ -176,6 +181,7 @@ impl ChatGptClient {
         host_id: String,
         previous_record: Option<String>,
         cancellation: &Cancellation,
+        method: Option<String>,
     ) -> napi::Result<LoginAttempt> {
         let previous = previous_record
             .as_deref()
@@ -187,11 +193,12 @@ impl ChatGptClient {
             host_id,
             previous,
             cancel.child_token(),
-            None,
+            auth::LoginMethod::parse(method.as_deref().unwrap_or("siwc"))?,
         )
         .await?;
         Ok(LoginAttempt {
-            url: Mutex::new(pending.url.clone()),
+            url: Mutex::new(pending.url().to_owned()),
+            user_code: pending.user_code().map(str::to_owned),
             pending: Mutex::new(Some(pending)),
             cancel,
         })
@@ -236,6 +243,7 @@ impl ChatGptClient {
         Ok(LogoutResult {
             record: session.encode()?,
             revocation_confirmed: confirmed,
+            local_only: session.login_method != auth::LoginMethod::Siwc,
         })
     }
 
@@ -252,7 +260,7 @@ impl ChatGptClient {
         }
         let models = tokio::select! {
             _ = cancellation.token.cancelled() => return Err(Error::Cancelled.into()),
-            result = self.transport.models(&session.access_token) => result?,
+            result = self.transport.models(&session) => result?,
         };
         Ok(models.into_iter().map(Model::from).collect())
     }

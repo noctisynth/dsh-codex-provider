@@ -242,7 +242,8 @@ test('the shipped settings preserve account actions, host React sharing and styl
   running = false
   accounts = [
     {
-      clientId: 'synthetic-account',
+      id: 'synthetic-account',
+      loginMethod: 'siwc',
       email: 'demo@example.com',
       name: 'Example User',
       picture: 'https://example.invalid/avatar.png',
@@ -344,7 +345,7 @@ test('the shipped settings preserve account actions, host React sharing and styl
   }
   let sidebar: ReactTestRenderer | undefined
   accounts = accounts.map((account) => ({ ...account, name: 'Sidebar User', hasCredentials: true }))
-  active = accounts[0].clientId
+  active = accounts[0].id
   try {
     await act(async () => {
       view = create(createElement(Settings, { rpc, preference, embedded: false }), {

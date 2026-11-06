@@ -46,12 +46,12 @@ pub(crate) fn stream(
 ) -> BoxStream<'static, Result<Value, Error>> {
     Box::pin(async_stream::try_stream! {
         if cancel.is_cancelled() { Err(Error::Cancelled)?; }
-        if !session.scopes.iter().any(|scope| scope == "chatgpt.tokens.use.direct") {
+        if !session.plan_usage_authorized() {
             Err(Error::Auth("ChatGPT plan usage was not authorized"))?;
         }
         let response = tokio::select! {
             _ = cancel.cancelled() => Err(Error::Cancelled),
-            response = transport.response(&session.access_token, &request) => response,
+            response = transport.response(&session, &request) => response,
         }?;
         let source = response.bytes_stream().eventsource()
             .map_err(|_| Error::Protocol("Invalid or interrupted OpenAI event stream")).boxed();

@@ -58,7 +58,15 @@ pub(crate) async fn listen(
     state: CsrfToken,
     cancel: CancellationToken,
 ) -> Result<(String, oneshot::Receiver<Callback>), Error> {
-    let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))
+    listen_on(state, cancel, 0).await
+}
+
+pub(crate) async fn listen_on(
+    state: CsrfToken,
+    cancel: CancellationToken,
+    port: u16,
+) -> Result<(String, oneshot::Receiver<Callback>), Error> {
+    let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, port))
         .await
         .map_err(Error::Listener)?;
     let port = listener.local_addr().map_err(Error::Listener)?.port();

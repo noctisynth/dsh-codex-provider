@@ -110,4 +110,7 @@
 - [x] 调研同时兼容 SIWC 与 legacy Codex 的代码改动、验证范围及维护成本；未实施 legacy，依据 EVIDENCE-026。
 - [x] 修正 Base UI Select 收起时的文案映射，验证初始加载及切换后的全部选项显示，生成变更集并本地提交，依据 EVIDENCE-025。
 - [x] 安装 Select 选中标签修复，核对 10 个安装文件及原生加载，依据 EVIDENCE-025。
-- [ ] 用户验收 Select 选中标签修复，依据 EVIDENCE-025。
+- [x] 用户确认 Select 选中标签恢复正常，依据 EVIDENCE-025。
+- [x] 实现三种模块化登录，SIWC 与 legacy 独立、两种 legacy 更新同一账号，复用前端流程并展示方式标签和设备码，依据 EVIDENCE-027。
+- [x] 完成 legacy 路由、刷新恢复的必要离线集成及真实入口探测，生成变更集并本地提交，依据 EVIDENCE-027。
+- [ ] 安装并由用户完成两种 legacy 授权，验证目录、对话、多轮工具、图片、压缩、恢复及 SIWC 并存，依据 EVIDENCE-027。

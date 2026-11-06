@@ -4,7 +4,6 @@ use std::{
         Arc,
         atomic::{AtomicU16, Ordering},
     },
-    time::{SystemTime, UNIX_EPOCH},
 };
 
 use openidconnect::{
@@ -13,24 +12,9 @@ use openidconnect::{
     core::{CoreTokenResponse, CoreTokenType},
 };
 
-use super::{Session, provider, verify};
+use crate::auth::provider::{expiry, now};
+use crate::auth::{Session, provider, verify};
 use crate::error::{ApiError, Error};
-
-pub(crate) fn now() -> Result<u64, Error> {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_secs())
-        .map_err(|_| Error::Auth("System clock is before the Unix epoch"))
-}
-
-pub(crate) fn expiry(tokens: &CoreTokenResponse) -> Result<u64, Error> {
-    let lifetime = tokens
-        .expires_in()
-        .ok_or(Error::Auth("ChatGPT token response omitted expiry"))?;
-    now()?
-        .checked_add(lifetime.as_secs())
-        .ok_or(Error::Auth("Invalid ChatGPT token expiry"))
-}
 
 /// The caller must hold DSH's credential transaction through persistence.
 pub(crate) async fn renew(http: &reqwest::Client, session: Session) -> Result<Session, Error> {
@@ -69,7 +53,7 @@ where
     let status = Arc::new(AtomicU16::new(0));
     let result = client
         .exchange_refresh_token(&RefreshToken::new(session.refresh_token.clone()))
-        .add_extra_param("resource", super::RESOURCE)
+        .add_extra_param("resource", crate::auth::RESOURCE)
         .request_async(&|request| {
             let response = http(request);
             let response_status = status.clone();
@@ -172,8 +156,10 @@ mod tests {
 
     fn registration() -> Session {
         Session {
+            login_method: Default::default(),
+            account_id: None,
             client_id: "issued-client".into(),
-            issuer: super::super::ISSUER.into(),
+            issuer: crate::auth::ISSUER.into(),
             subject: "test-subject".into(),
             email: Some("test@example.invalid".into()),
             name: Some("Example User".into()),
@@ -190,7 +176,7 @@ mod tests {
 
     fn client() -> Result<provider::Client, Box<dyn std::error::Error>> {
         let metadata = serde_json::from_value(serde_json::json!({
-            "issuer": super::super::ISSUER,
+            "issuer": crate::auth::ISSUER,
             "authorization_endpoint": "https://auth.openai.com/authorize",
             "jwks_uri": "https://auth.openai.com/jwks",
             "response_types_supported": ["code"],

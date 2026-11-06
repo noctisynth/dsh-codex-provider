@@ -78,6 +78,10 @@ export function mountAccountUi(
             interaction: {
               notify: (notice) => {
                 state.notice = notice.message
+                state.device =
+                  notice.code && notice.url === 'https://auth.openai.com/codex/device'
+                    ? { url: notice.url, code: notice.code }
+                    : undefined
               },
               prompt: (request) => prompt(request, attemptController.signal),
             },
@@ -85,12 +89,16 @@ export function mountAccountUi(
           .then((outcome) => {
             if (outcome.status !== 'authorized') state.notice = '已取消登录。'
           })
-          .catch(() => {
-            state.error = 'ChatGPT 登录未完成，请重试。'
+          .catch((error: unknown) => {
+            state.error =
+              error instanceof Error && 'code' in error && error.code === 'GenericFailure'
+                ? error.message
+                : 'ChatGPT 登录未完成，请重试。'
           })
           .finally(() => {
             state.running = false
             delete state.prompt
+            delete state.device
             pendingPrompt = undefined
           })
         return null
@@ -111,17 +119,17 @@ export function mountAccountUi(
         if (login.running) throw new Error('请先完成或取消登录。')
         const id = selectedId(payload)
         operations.dispose()
-        let confirmed: boolean | undefined
+        let outcome: { revocationConfirmed?: boolean; localOnly?: boolean } = {}
         if (action === 'select') await accounts.select(id)
         else {
           const operation = operations.start(signal)
           try {
-            confirmed = await accounts.logout(id, operation.cancellation)
+            outcome = await accounts.logout(id, operation.cancellation)
           } finally {
             operation.close()
           }
         }
-        return { revocationConfirmed: confirmed }
+        return outcome
       }
       default:
         throw new Error('未知 ChatGPT 操作。')

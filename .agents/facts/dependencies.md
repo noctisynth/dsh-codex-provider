@@ -48,3 +48,5 @@ Gravatar 官方图片服务按规范化邮箱的 SHA-256 定位头像，支持�
 2026-11-07 复核 SIWC 公开限制：max_output_tokens 与 temperature 不受支持；错误响应可为顶层 detail；终止刷新错误需清理不可用令牌并保留注册身份。DSH 0.2.2-rc.1 的摘要压缩会传 maxTokens，失败后压缩依赖 CONTEXT_WINDOW_EXCEEDED 分类。依据 EVIDENCE-018、EVIDENCE-019；实现状态由 TODO-001 维护。
 
 2026-11-07 核对：SIWC 官方要求公开 Responses，不能将其授权指向 ChatGPT backend。DSH 随附 pi-ai 1.3.0 的 legacy Codex provider 使用固定客户端、独立 OAuth 地址、账号请求头及 backend Responses；这是发布实现观察，不是第三方公开契约。依据 EVIDENCE-026。
+
+2026-11-07 真实入口探测确认 Codex 设备码服务可签发用户码，当前原生流程能取消；浏览器回调入口也能启动并取消。没有完成用户授权或证明 legacy 推理可用。两种 legacy 登录更新同一账号、SIWC 独立保留是用户确认的产品行为，其实现与验证范围见 EVIDENCE-027。

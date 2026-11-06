@@ -1,4 +1,5 @@
 use crate::{
+    auth::{LoginMethod, Session},
     error::{ApiError, Error},
     models::{self, Model},
 };
@@ -15,18 +16,27 @@ impl Transport {
 
     pub async fn response(
         &self,
-        access_token: &str,
+        session: &Session,
         request: &crate::responses::Request,
     ) -> Result<reqwest::Response, Error> {
+        let mut body = serde_json::to_value(crate::responses::StreamingRequest {
+            request,
+            store: false,
+            stream: true,
+        })
+        .map_err(|_| Error::Protocol("Invalid Responses request"))?;
+        if session.login_method != LoginMethod::Siwc && body.get("instructions").is_none() {
+            body["instructions"] = "".into();
+        }
         let response = self
-            .client
-            .post("https://api.openai.com/v1/responses")
-            .bearer_auth(access_token)
-            .json(&crate::responses::StreamingRequest {
-                request,
-                store: false,
-                stream: true,
-            })
+            .authorized(
+                session,
+                self.client.post(match session.login_method {
+                    LoginMethod::Siwc => "https://api.openai.com/v1/responses",
+                    _ => "https://chatgpt.com/backend-api/codex/responses",
+                }),
+            )?
+            .json(&body)
             .send()
             .await
             .map_err(Error::Network)?;
@@ -54,11 +64,37 @@ impl Transport {
         Ok(Self { client })
     }
 
-    pub async fn models(&self, access_token: &str) -> Result<Vec<Model>, Error> {
+    fn authorized(
+        &self,
+        session: &Session,
+        request: reqwest::RequestBuilder,
+    ) -> Result<reqwest::RequestBuilder, Error> {
+        let request = request.bearer_auth(&session.access_token);
+        if session.login_method == LoginMethod::Siwc {
+            return Ok(request);
+        }
+        Ok(request
+            .header(
+                "chatgpt-account-id",
+                session
+                    .account_id
+                    .as_deref()
+                    .ok_or(Error::Auth("Codex workspace account is missing"))?,
+            )
+            .header("originator", "dsh-codex-provider")
+            .header("OpenAI-Beta", "responses=experimental"))
+    }
+
+    pub async fn models(&self, session: &Session) -> Result<Vec<Model>, Error> {
+        let request = match session.login_method {
+            LoginMethod::Siwc => self.client.get("https://api.openai.com/v1/models"),
+            _ => self
+                .client
+                .get("https://chatgpt.com/backend-api/codex/models")
+                .query(&[("client_version", env!("CARGO_PKG_VERSION"))]),
+        };
         let response = self
-            .client
-            .get("https://api.openai.com/v1/models")
-            .bearer_auth(access_token)
+            .authorized(session, request)?
             .send()
             .await
             .map_err(Error::Network)?;

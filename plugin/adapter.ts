@@ -100,7 +100,7 @@ export class ChatGptAdapter extends LlmAdapter {
     const vault = await this.accounts.read()
     return !!vault?.accounts.some((record) => {
       const account = native.describeSession(record)
-      return account.clientId === vault.active && account.hasCredentials
+      return account.id === vault.active && account.hasCredentials
     })
   }
 

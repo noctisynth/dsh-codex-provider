@@ -6,10 +6,10 @@ use openidconnect::{
 use tokio::sync::oneshot;
 use tokio_util::sync::CancellationToken;
 
-use super::{
+use crate::auth::{
     Session,
     callback::{self, Callback},
-    provider, renewal, verify,
+    provider, verify,
 };
 use crate::error::Error;
 
@@ -67,9 +67,10 @@ pub(crate) async fn begin_login(
     let client_id = retry_client_id
         .as_deref()
         .or_else(|| previous.as_ref().map(|session| session.client_id.as_str()))
-        .unwrap_or(super::DYNAMIC_CLIENT);
+        .unwrap_or(crate::auth::DYNAMIC_CLIENT);
     let client = provider::client(metadata.clone(), client_id.into())?;
-    let expected_client_id = (client_id != super::DYNAMIC_CLIENT).then(|| client_id.to_owned());
+    let expected_client_id =
+        (client_id != crate::auth::DYNAMIC_CLIENT).then(|| client_id.to_owned());
     let state = CsrfToken::new_random();
     let nonce = Nonce::new_random();
     let (challenge, verifier) = PkceCodeChallenge::new_random_sha256();
@@ -87,7 +88,7 @@ pub(crate) async fn begin_login(
         )
         .set_pkce_challenge(challenge)
         .add_extra_param("ext_agent_host_id", host_id.clone())
-        .add_extra_param("resource", super::RESOURCE);
+        .add_extra_param("resource", crate::auth::RESOURCE);
     for scope in [
         "profile",
         "email",
@@ -104,7 +105,7 @@ pub(crate) async fn begin_login(
         if let Some(email) = &session.email {
             request = request.add_extra_param("login_hint", email.clone());
         }
-    } else if client_id == super::DYNAMIC_CLIENT {
+    } else if client_id == crate::auth::DYNAMIC_CLIENT {
         request = request.add_extra_param("agent_name_hint", "DSH Codex Provider");
     }
     let (url, _, _) = request.url();
@@ -132,7 +133,7 @@ fn issued_client_id(callback: &Callback, expected: Option<&str>) -> Result<Strin
         (Some(_), Some(_)) => Err(Error::Auth(
             "ChatGPT callback changed the selected registration",
         )),
-        (None, Some(id)) if !id.is_empty() && id != super::DYNAMIC_CLIENT => Ok(id.into()),
+        (None, Some(id)) if !id.is_empty() && id != crate::auth::DYNAMIC_CLIENT => Ok(id.into()),
         _ => Err(Error::Auth(
             "ChatGPT registration did not return an issued client ID",
         )),
@@ -187,7 +188,7 @@ impl PendingLogin {
         let token_result = client
             .exchange_code(AuthorizationCode::new(code))
             .set_pkce_verifier(verifier)
-            .add_extra_param("resource", super::RESOURCE)
+            .add_extra_param("resource", crate::auth::RESOURCE)
             .request_async(&self.http)
             .await;
         let tokens = match token_result {
@@ -223,8 +224,10 @@ impl PendingLogin {
             .iter()
             .map(|scope| scope.as_str().to_owned())
             .collect();
-        let expires_at = renewal::expiry(&tokens)?;
+        let expires_at = provider::expiry(&tokens)?;
         Ok(Session {
+            login_method: Default::default(),
+            account_id: None,
             client_id,
             issuer: identity.issuer,
             subject: identity.subject,

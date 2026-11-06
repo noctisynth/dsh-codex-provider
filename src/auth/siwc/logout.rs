@@ -3,7 +3,7 @@ use std::time::Duration;
 use serde::Deserialize;
 use tokio_util::sync::CancellationToken;
 
-use super::Session;
+use crate::auth::Session;
 
 #[derive(Deserialize)]
 struct RevocationMetadata {
@@ -43,7 +43,7 @@ async fn revoke_inner(http: &reqwest::Client, session: &Session) -> bool {
     let Ok(metadata) = response.json::<RevocationMetadata>().await else {
         return false;
     };
-    if metadata.issuer != super::ISSUER || metadata.revocation_endpoint.scheme() != "https" {
+    if metadata.issuer != crate::auth::ISSUER || metadata.revocation_endpoint.scheme() != "https" {
         return false;
     }
     // Protocol-required retry for a network error or a 5xx; never retry a 4xx.

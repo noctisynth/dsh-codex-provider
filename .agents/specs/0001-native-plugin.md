@@ -110,15 +110,29 @@ DSH 适配提供宿主 attributionHeaders，由共享 HTTP 客户端发送；账
 
 ## 授权与请求流程
 
+三种登录实现按 SIWC、legacy 浏览器、legacy 设备码分别封装；legacy 两种方式仅共用令牌交换、身份验证、刷新及后端路由。原生边界接收封闭的登录方式枚举，不接受前端指定端点或凭据字段。账号摘要增加稳定账号键和登录方式，SIWC 保留原 client_id 对应账号键，旧记录缺省方式仍为 SIWC；legacy 使用独立路线、工作区账号与主体区分，浏览器及设备码更新同一 legacy 记录；不影响 SIWC。刷新与退出仍由 DSH 凭据事务串行持有。
+
+前端共用既有授权交互、账号列表及操作。添加账号先选择登录方式；已有账号重新登录沿用其方式。主机打开系统浏览器，设备码验证地址和短码通过授权通知投影至界面；完整 OAuth URL、设备授权句柄及令牌不进入浏览器。原生负责轮询间隔、超时、取消、交换及验证；设备码不启动回调服务。legacy 浏览器使用其固定回调端口，端口被占用时报告可操作错误，不自动终止其他客户端。
+
+模型目录和 Responses 按保存的授权类型选择路由与请求头，复用宿主模型、消息、图片及流事件映射。SIWC 的 scope 校验和公开接口约束保持独立，不为支持 legacy 放宽；账号切换沿用现有目录失效行为。不新增 WebSocket、代理配置或通用认证框架。
+
+### SIWC 授权
+
 先持久化 host ID，绑定 127.0.0.1 临时端口及固定回调路由，再使用宿主能力打开系统浏览器。每次授权由库生成 state、nonce 和 S256 PKCE，业务层补充 ChatGPT 参数。动态注册回调后使用颁发 client ID 创建 public client、换取令牌及校验 audience。
 
 校验回调 state、OAuth 错误、注册 ID，以及 ID token 的签名、issuer、audience、expiry、nonce。重授权核实原身份后才替换记录，使用 token 响应 scopes 判断订阅权限。保存验证后的身份、邮箱、ID token、access/refresh token、注册信息与到期时间，不解析 access token 猜测身份。
 
 刷新按会话串行，使用原注册 client ID，持久化轮换结果后再继续请求。响应缺少新账号资料时保留已验证资料；新的身份资料需验证。退出按官方会话撤销及本地清除处理，准确报告未确认的远端撤销。注册按 issued client ID 与验证身份隔离；账号选择和添加遵守官方契约，具体宿主交互仍需确定，不从存储结构推导附加功能。
 
-原生刷新在到期前 60 秒内执行；未到期的记录直接返回。完整刷新与退出限时 25 秒，以配合目标凭据 provider 的锁等待。撤销仅针对网络失败与 5xx 做有限退避，不形成通用重试层。invalid_grant 保留本次 issued client ID，显式重试重新生成授权随机值；不自动重放失效 code。
+### Legacy 授权
 
-复用 reqwest 客户端，授权请求禁用自动重定向，按官方元数据发现 JWKS。模型来自公开目录；请求使用公开 Responses、store=false、stream=true，不硬编码型号或静默回退。SSE 处理文本、工具参数增量及终止状态，完成以 response.completed 判断；错误、不完整和断流分别处理。不自动重连重放推理。
+浏览器登录校验 state 并使用 S256 PKCE；设备码轮询获得授权码与 verifier，再完成对应交换。两种方式共享通过 OpenID Connect 的 JWKS、签名、issuer、audience、expiry 和 access-token hash 校验，不只解码 JWT 即接受身份。验证后的 ID token 提供工作区账号；重新登录与返回新 ID token 的刷新核对主体及工作区。legacy 未请求 nonce，不套用 SIWC 的 nonce 与 direct scope 要求。退出按 Codex 语义清除此插件的本地令牌并保留账号信息，不宣称已远端撤销；SIWC 的远端撤销流程保持独立。
+
+### 共享生命周期与传输
+
+原生刷新在到期前 60 秒内执行；未到期的记录直接返回。完整刷新与退出限时 25 秒，以配合目标凭据 provider 的锁等待。SIWC 撤销仅针对网络失败与 5xx 做有限退避，不形成通用重试层。SIWC 授权码 invalid_grant 保留本次 issued client ID，显式重试重新生成授权随机值；不自动重放失效 code。legacy 设备码按服务端间隔轮询，slow_down 增加等待，15 分钟后到期；取消中止轮询及交换。
+
+复用 reqwest 客户端，授权请求禁用自动重定向，按官方元数据发现 JWKS。模型目录和 Responses 按授权路线选择，SIWC 使用公开接口，legacy 使用 Codex backend；store=false、stream=true，不硬编码型号或静默回退。SSE 处理文本、工具参数增量及终止状态，完成以 response.completed 判断；错误、不完整和断流分别处理。不自动重连重放推理。
 
 优先使用 reqwest 环境代理能力；系统代理与自定义证书需求待确定，不预设已支持或自行读取系统设置。
 

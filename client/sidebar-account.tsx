@@ -37,7 +37,7 @@ export function ChatGptLauncher({
   const trigger = useRef<HTMLButtonElement>(null)
   const selected = useRef<'settings' | 'logout' | null>(null)
   const account = status?.accounts.find(
-    (account) => account.clientId === status.active && account.hasCredentials,
+    (account) => account.id === status.active && account.hasCredentials,
   )
   const label = account?.name || account?.email || 'ChatGPT'
   const failure = preferenceError || error
@@ -154,7 +154,7 @@ export function ChatGptLauncher({
           close={() => setLogout(null)}
           confirm={() => {
             setLogout(null)
-            void act('logout', { id: logout.clientId }).then((success) => {
+            void act('logout', { id: logout.id }).then((success) => {
               if (!success) setOpen(true)
             })
           }}

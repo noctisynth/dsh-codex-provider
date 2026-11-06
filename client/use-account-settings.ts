@@ -88,7 +88,8 @@ export function useAccountSettings(rpc: ClientConnectionRpc) {
       const value = await call(action, payload)
       if (action === 'login') ownedLogin.current = true
       if (action === 'logout') {
-        if ((value as AccountActions['logout']).revocationConfirmed) setNotice('已退出登录')
+        const logout = value as AccountActions['logout']
+        if (logout.revocationConfirmed || logout.localOnly) setNotice('已退出登录')
         else {
           setError('本地凭据已清除，未能确认远端授权撤销。')
           return false

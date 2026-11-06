@@ -10,13 +10,14 @@ export interface LoginState {
   notice?: string
   prompt?: LoginPrompt
   error?: string
+  device?: { url: string; code: string }
 }
 
 export interface AccountStatus {
   active?: string
   accounts: (Pick<
     AccountInfo,
-    'clientId' | 'email' | 'name' | 'picture' | 'hasCredentials' | 'planUsageAuthorized'
+    'id' | 'loginMethod' | 'email' | 'name' | 'picture' | 'hasCredentials' | 'planUsageAuthorized'
   > & {
     gravatarPicture?: string
   })[]
@@ -29,5 +30,5 @@ export interface AccountActions {
   answer: null
   cancel: null
   select: { revocationConfirmed?: boolean }
-  logout: { revocationConfirmed: boolean }
+  logout: { revocationConfirmed: boolean; localOnly?: boolean }
 }

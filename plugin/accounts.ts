@@ -6,6 +6,7 @@ import { LlmError } from '@deepseek-ai/dsh-llm'
 import open from 'open'
 import type { Cancellation, ChatGptClient, LoginAttempt, LoginResult } from '../index.cjs'
 import native from '../index.cjs'
+import { loginMethodLabel, loginMethods } from '../shared/login-methods.ts'
 import type { Operations } from './operations.ts'
 
 interface Vault {
@@ -33,11 +34,18 @@ export class Accounts {
   credentials: CredentialProvider
   client: ChatGptClient
   operations: Operations
+  private openBrowser: (url: string) => Promise<unknown>
 
-  constructor(credentials: CredentialProvider, client: ChatGptClient, operations: Operations) {
+  constructor(
+    credentials: CredentialProvider,
+    client: ChatGptClient,
+    operations: Operations,
+    openBrowser: (url: string) => Promise<unknown> = open,
+  ) {
     this.credentials = credentials
     this.client = client
     this.operations = operations
+    this.openBrowser = openBrowser
   }
 
   async read() {
@@ -49,14 +57,15 @@ export class Accounts {
     return {
       active: vault?.active,
       accounts: (vault?.accounts ?? []).map((record) => {
-        const { clientId, email, name, picture, hasCredentials, planUsageAuthorized } =
+        const { id, loginMethod, email, name, picture, hasCredentials, planUsageAuthorized } =
           native.describeSession(record)
         const normalizedEmail = email?.trim().toLowerCase()
         const gravatarPicture = normalizedEmail
           ? `https://gravatar.com/avatar/${createHash('sha256').update(normalizedEmail).digest('hex')}?s=96&d=404&r=g`
           : undefined
         return {
-          clientId,
+          id,
+          loginMethod,
           email,
           name,
           picture,
@@ -68,31 +77,29 @@ export class Accounts {
     }
   }
 
-  async select(clientId: string): Promise<void> {
+  async select(id: string): Promise<void> {
     await this.credentials.modifyRecord(accountsKey, async (current) => {
       const vault = requiredVault(current)
-      if (!vault?.accounts.some((record) => native.describeSession(record).clientId === clientId)) {
+      if (!vault?.accounts.some((record) => native.describeSession(record).id === id)) {
         throw new LlmError('未找到该 ChatGPT 注册。', 'AUTH')
       }
-      return { kind: 'grant', payload: { ...vault, active: clientId } }
+      return { kind: 'grant', payload: { ...vault, active: id } }
     })
   }
 
-  async logout(clientId: string, cancellation: Cancellation): Promise<boolean> {
-    let confirmed = false
+  async logout(id: string, cancellation: Cancellation) {
+    let outcome = { revocationConfirmed: false, localOnly: false }
     await this.credentials.modifyRecord(accountsKey, async (current) => {
       const vault = requiredVault(current)
-      const index = vault.accounts.findIndex(
-        (record) => native.describeSession(record).clientId === clientId,
-      )
+      const index = vault.accounts.findIndex((record) => native.describeSession(record).id === id)
       if (index < 0) throw new LlmError('未找到该 ChatGPT 注册。', 'AUTH')
       const result = await this.client.logoutSession(vault.accounts[index], cancellation)
-      confirmed = result.revocationConfirmed
+      outcome = { revocationConfirmed: result.revocationConfirmed, localOnly: result.localOnly }
       const accounts = [...vault.accounts]
       accounts[index] = result.record
       return { kind: 'grant', payload: { ...vault, accounts } }
     })
-    return confirmed
+    return outcome
   }
 
   async selected(cancellation: Cancellation): Promise<string> {
@@ -101,7 +108,7 @@ export class Accounts {
     await this.credentials.modifyRecord(accountsKey, async (current) => {
       const vault = requiredVault(current)
       const record = vault.accounts.find(
-        (record) => native.describeSession(record).clientId === vault.active,
+        (record) => native.describeSession(record).id === vault.active,
       )
       if (!record || !native.describeSession(record).hasCredentials) {
         throw new LlmError('请先在设置 → ChatGPT 中登录。', 'AUTH')
@@ -148,25 +155,34 @@ export class Accounts {
             ...vault.accounts.map((record) => {
               const account = native.describeSession(record)
               return {
-                id: account.clientId,
+                id: account.id,
                 label: account.email ?? 'ChatGPT 账号',
-                description: account.clientId,
+                description: loginMethodLabel(account.loginMethod),
               }
             }),
             { id: 'add', label: '添加 ChatGPT 账号' },
           ],
         })
         if (choice !== 'add')
-          previous = vault.accounts.find(
-            (record) => native.describeSession(record).clientId === choice,
-          )
+          previous = vault.accounts.find((record) => native.describeSession(record).id === choice)
       }
-      attempt = await this.client.beginLogin(vault.hostId, previous, operation.cancellation)
+      const method = previous
+        ? native.describeSession(previous).loginMethod
+        : await session.prompt({ kind: 'select', message: '选择登录方式', options: loginMethods })
+      attempt = await this.client.beginLogin(vault.hostId, previous, operation.cancellation, method)
       let result: LoginResult
       for (;;) {
         session.signal.throwIfAborted()
-        session.notify({ message: '请在系统浏览器中完成 ChatGPT 官方登录。' })
-        await open(attempt.authorizationUrl)
+        session.notify(
+          attempt.userCode
+            ? {
+                message: '请打开验证页面，输入下方设备码完成登录。',
+                url: attempt.authorizationUrl,
+                code: attempt.userCode,
+              }
+            : { message: '请在系统浏览器中完成 ChatGPT 登录。' },
+        )
+        await this.openBrowser(attempt.authorizationUrl)
         try {
           result = await attempt.complete()
           break
@@ -188,10 +204,10 @@ export class Accounts {
         session.signal.throwIfAborted()
         const latest = requiredVault(current)
         const accounts = latest.accounts.filter(
-          (record) => native.describeSession(record).clientId !== result.account.clientId,
+          (record) => native.describeSession(record).id !== result.account.id,
         )
         accounts.push(result.record)
-        return { kind: 'grant', payload: { ...latest, accounts, active: result.account.clientId } }
+        return { kind: 'grant', payload: { ...latest, accounts, active: result.account.id } }
       })
       session.notify({
         message: result.account.planUsageAuthorized

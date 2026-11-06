@@ -165,7 +165,7 @@ test('search modes isolate auxiliary requests and shared search preserves comple
   const record = sessionRecord(),
     account = describeSession(record)
   const accounts = {
-    read: async () => ({ active: account.clientId, accounts: [record] }),
+    read: async () => ({ active: account.id, accounts: [record] }),
     selected: async () => record,
   } as unknown as Accounts
   const client = new ChatGptClient({}),

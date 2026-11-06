@@ -36,7 +36,7 @@ test('DSH preserves images for vision models and projects text-only and offloade
   const record = sessionRecord()
   const accounts = {
     selected: async () => record,
-    read: async () => ({ active: native.describeSession(record).clientId, accounts: [record] }),
+    read: async () => ({ active: native.describeSession(record).id, accounts: [record] }),
   } as unknown as Accounts
   const client = new native.ChatGptClient({})
   client.listModels = async () => [

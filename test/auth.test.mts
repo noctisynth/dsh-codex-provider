@@ -46,6 +46,8 @@ test('invalid host identifiers fail at the native boundary', async () => {
 test('account summaries expose optional profile data while older sessions remain readable', () => {
   const previous = sessionRecord()
   assert.equal(describeSession(previous).name == null, true)
+  assert.equal(describeSession(previous).loginMethod, 'siwc')
+  assert.equal(describeSession(previous).id, JSON.parse(previous).client_id)
   const profile = describeSession(
     JSON.stringify({
       ...JSON.parse(previous),
@@ -56,4 +58,20 @@ test('account summaries expose optional profile data while older sessions remain
   assert.equal(profile.name, 'Example User')
   assert.equal(profile.picture, 'https://example.invalid/avatar.png')
   assert.equal('id_token' in profile, false)
+})
+
+test('all login methods cancel before network access and reject unknown methods', async () => {
+  const client = new ChatGptClient({})
+  for (const method of ['siwc', 'codex-browser', 'codex-device']) {
+    const cancellation = new Cancellation()
+    cancellation.cancel()
+    await assert.rejects(
+      client.beginLogin(createHostId(), undefined, cancellation, method),
+      /sign-in cancelled/,
+    )
+  }
+  await assert.rejects(
+    client.beginLogin(createHostId(), undefined, new Cancellation(), 'unknown'),
+    /Unknown ChatGPT login method/,
+  )
 })

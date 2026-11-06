@@ -4,6 +4,8 @@ use crate::{auth, error::Error, models};
 
 #[napi(object)]
 pub struct AccountInfo {
+    pub id: String,
+    pub login_method: String,
     pub client_id: String,
     pub subject: String,
     pub email: Option<String>,
@@ -16,15 +18,14 @@ pub struct AccountInfo {
 impl From<&auth::Session> for AccountInfo {
     fn from(session: &auth::Session) -> Self {
         Self {
+            id: session.key(),
+            login_method: session.login_method.as_str().into(),
             client_id: session.client_id.clone(),
             subject: session.subject.clone(),
             email: session.email.clone(),
             name: session.name.clone(),
             picture: session.picture.clone(),
-            plan_usage_authorized: session
-                .scopes
-                .iter()
-                .any(|scope| scope == "chatgpt.tokens.use.direct"),
+            plan_usage_authorized: session.plan_usage_authorized(),
             has_credentials: !session.access_token.is_empty() && !session.refresh_token.is_empty(),
         }
     }
@@ -53,6 +54,7 @@ impl TryFrom<auth::Session> for LoginResult {
 pub struct LogoutResult {
     pub record: String,
     pub revocation_confirmed: bool,
+    pub local_only: bool,
 }
 
 #[napi(object)]

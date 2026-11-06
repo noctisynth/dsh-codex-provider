@@ -16,6 +16,10 @@ Rust 保留目录中的 supported_reasoning_levels 和 default_reasoning_level�
 
 手写宿主适配和浏览器代码使用 TypeScript。tsdown 基于 Rolldown/Oxc 构建宿主 ESM 与浏览器标准 closure factory，React 由宿主提供；Oxc 的 tsrs 通过 tsconfig 检查类型。此适配仅声明宿主要求的模块入口，不实现新的浏览器模块加载器。原生构建继续完全由 napi-rs 管理。tsrs 为实验性工具，实际兼容结果由证据记录，遇到阻碍时说明，不静默替换编译器。
 
+界面重设计采用 React 与 TypeScript，保持宿主 React 运行时共享。按实际使用引入 shadcn/ui 组件，采用 Tailwind utilities；关闭插件侧 Preflight，避免重置宿主元素，使用插件专属前缀隔离工具类。颜色和字体优先映射 DSH 主题，不引入独立主题开关。仅保留 Tailwind 构建指令、必要主题映射及宿主样式装载所需的最小 CSS。组件版本与 React 18 的兼容性、Tailwind 产物的加载和样式边界须在实现时验证。
+
+拟采用紧凑的连接状态、账号行和主操作层级，替换目前的原生按钮和内联样式；主设置页与插件配置面共用组件。加载、浏览器授权等待、账号选择和错误状态沿用现有后端契约。
+
 本地桌面验证使用文本模型能力声明。宿主负责图片占位和文件投影，工具使用非严格函数 schema，工具参数保持原始字符串。完成事件按宿主内容块关联完整 Responses output 项；后续调用重放保留项，避免重复发送推理摘要。公开目录未提供的模型能力不自行推断。
 
 流中的完整输出以带 output_index 的 output_item.done 收集；完成通知可以不重复输出数组，不能因此清空历史。完成通知若携带完整输出则使用该数组，否则按输出索引恢复已完成项，再映射到宿主重放资料。

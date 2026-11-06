@@ -3,7 +3,9 @@ use std::sync::Mutex;
 use napi_derive::napi;
 use tokio_util::sync::CancellationToken;
 
-use crate::{auth, error::Error, models, transport::Transport};
+use crate::{auth, error::Error, models, responses, transport::Transport};
+use futures_util::StreamExt;
+use napi::{Env, bindgen_prelude::ReadableStream};
 
 /// Connect a DSH AbortSignal or plugin disposal to this backend operation.
 #[napi]
@@ -193,6 +195,34 @@ pub struct ChatGptClient {
 
 #[napi]
 impl ChatGptClient {
+    /// Backend-only stream. Always cancel the native handle before cancelling a pending JS reader.
+    #[napi]
+    pub fn stream_response<'env>(
+        &self,
+        env: &'env Env,
+        record: String,
+        request_json: String,
+        cancellation: &Cancellation,
+    ) -> napi::Result<ReadableStream<'env, serde_json::Value>> {
+        let session = auth::Session::decode(&record)?;
+        if !session
+            .scopes
+            .iter()
+            .any(|scope| scope == "chatgpt.tokens.use.direct")
+        {
+            return Err(Error::Auth("ChatGPT plan usage was not authorized").into());
+        }
+        let request = responses::Request::decode(&request_json)?;
+        let events = responses::stream(
+            self.transport.clone(),
+            session,
+            request,
+            cancellation.token.child_token(),
+        )
+        .map(|event| event.map_err(napi::Error::from));
+        ReadableStream::new(env, Box::pin(events))
+    }
+
     #[napi(constructor)]
     pub fn new() -> napi::Result<Self> {
         Ok(Self {

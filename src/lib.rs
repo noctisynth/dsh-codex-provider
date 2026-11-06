@@ -1,6 +1,7 @@
 mod binding;
 mod error;
 mod models;
+mod responses;
 mod transport;
 
 pub use binding::{

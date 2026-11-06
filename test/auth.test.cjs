@@ -1,6 +1,7 @@
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
 const { ChatGptClient, Cancellation, createHostId, describeSession } = require('../index.js')
+const { sessionRecord } = require('./session-fixture.cjs')
 
 test('aborted native sign-in rejects without opening a browser or making discovery requests', async () => {
   const client = new ChatGptClient()
@@ -8,15 +9,6 @@ test('aborted native sign-in rejects without opening a browser or making discove
   cancellation.cancel()
   await assert.rejects(client.beginLogin(createHostId(), undefined, cancellation), /sign-in cancelled/)
 })
-
-function sessionRecord() {
-  return JSON.stringify({
-    client_id: 'test-issued-client', issuer: 'https://auth.openai.com', subject: 'test-subject',
-    email: 'test@example.invalid', host_id: createHostId(), id_token: 'test-id-token', nonce: 'test-nonce',
-    access_token: 'test-access-token', refresh_token: 'test-refresh-token',
-    expires_at: Math.floor(Date.now() / 1000) + 3600, scopes: ['chatgpt.tokens.use.direct'],
-  })
-}
 
 test('a fresh native session retains its record without a refresh request', async () => {
   const record = sessionRecord()

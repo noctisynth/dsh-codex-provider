@@ -10,6 +10,16 @@ pub(crate) enum Error {
     Auth(&'static str),
     #[error("OAuth callback listener failed")]
     Listener(#[source] std::io::Error),
+    #[error("{0}")]
+    Protocol(&'static str),
+    #[error("OpenAI response failed: {0}")]
+    ResponseFailed(String),
+    #[error("OpenAI response was incomplete: {0}")]
+    Incomplete(String),
+    #[error("OpenAI stream ended before response.completed")]
+    Interrupted,
+    #[error("OpenAI request cancelled")]
+    Cancelled,
 }
 
 impl From<Error> for napi::Error {

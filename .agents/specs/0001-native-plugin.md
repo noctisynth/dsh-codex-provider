@@ -14,6 +14,8 @@ Rust 按认证、请求及流式事件、绑定边界划分模块；按实际职
 
 ## 官方协议与依赖
 
+DSH 适配提供宿主 attributionHeaders，由共享 HTTP 客户端发送；账号和认证资料不进入这些公开应用身份 header。消息及工具转换以目标宿主类型为依据，完成实际集成前不标记 Provider 交付。
+
 采用官方开源应用授权和公开请求路径。授权注册、身份验证、令牌更新等具体契约以实施时官方文档为准；依据记录在 FACT-001 与 EVIDENCE-001，不在此复制调研材料。
 
 | 能力 | 选型 | 使用边界 |
@@ -24,6 +26,7 @@ Rust 按认证、请求及流式事件、绑定边界划分模块；按实际职
 | HTTP/TLS | reqwest 0.12，rustls-tls、json、stream | 与 OIDC 共享客户端版本，不使用 blocking |
 | loopback 回调 | axum 0.8 | 登录时临时监听，不建立常驻管理服务 |
 | SSE | eventsource-stream 0.2、futures-util 0.3 | 负责分帧，业务模块解释 Responses 事件 |
+| 流生成 | async-stream 0.3 | 按需生成事件，避免手写状态机及额外后台队列 |
 | 取消 | tokio-util 0.7 CancellationToken | 登录、请求和卸载生命周期 |
 | 数据与错误 | serde 1、serde_json 1、thiserror 2 | 明确边界类型，不建 Schema 框架 |
 | host ID | uuid 1，v4 | 持久化官方支持的 UUID host 标识 |

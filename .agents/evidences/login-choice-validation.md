@@ -47,7 +47,19 @@
 
 另核对官方公开源码 commit f57966695fc936a1b4e5da6758ad6d532724fe83：AccountSession 虽声明用户 image_url，但当前映射直接赋 None；工作区图片另行映射 profile_picture_url。公开 Rust ProfileIdentity 类型未建模头像，不能由此推断服务端响应没有头像；桌面代码还会从 https://chatgpt.com/backend-api/wham/profiles/me 的 profile.profile_picture_url 读取资料页图片。来源：https://github.com/openai/codex/blob/f57966695fc936a1b4e5da6758ad6d532724fe83/codex-rs/app-server/src/request_processors/account_processor/workspace_switching.rs#L43 、https://github.com/openai/codex/blob/f57966695fc936a1b4e5da6758ad6d532724fe83/codex-rs/backend-client/src/client/profile.rs#L18 。
 
-公开 Codex 认证实现将后端认证提供者注明为第一方凭据；SIWC 官方 token reference 则规定本项目流程的 audience 为 https://api.openai.com/v1 ，其 app-server 接入指南配置的是独立 Responses provider。此次未找到支持 SIWC 动态客户端调用上述 backend-api 资料接口的官方公开说明，也没有对这些接口进行兼容性实测，因此不宣称必然返回 401/403。既有公开身份途径仍为经验证的 ID token 与 discovery 的 UserInfo；后者在当前账号的观察结果见前文。来源：https://github.com/openai/codex/blob/f57966695fc936a1b4e5da6758ad6d532724fe83/codex-rs/model-provider/src/auth.rs#L522 、https://developers.openai.com/siwc/token-sharing-open-source/token-reference 、https://developers.openai.com/siwc/token-sharing-open-source/codex-app-server 。
+公开 Codex 认证实现将后端认证提供者注明为第一方凭据；SIWC 官方 token reference 则规定本项目流程的 audience 为 https://api.openai.com/v1 ，其 app-server 接入指南配置的是独立 Responses provider。此次未找到支持 SIWC 动态客户端调用上述 backend-api 资料接口的官方公开说明；静态调查本身不证明接口会拒绝该 token，后续用户授权实测见下一节。既有公开身份途径仍为经验证的 ID token 与 discovery 的 UserInfo。来源：https://github.com/openai/codex/blob/f57966695fc936a1b4e5da6758ad6d532724fe83/codex-rs/model-provider/src/auth.rs#L522 、https://developers.openai.com/siwc/token-sharing-open-source/token-reference 、https://developers.openai.com/siwc/token-sharing-open-source/codex-app-server 。
+
+### 现有 SIWC token 的头像接口实测
+
+2026-11-06，按用户要求，只读使用 DSH 当前活动账号已有的 access token。请求前核对其本地到期时间仍有效；discovery 返回 200，UserInfo 地址与官方公开地址一致。每个资料接口仅发送一次 Bearer GET，禁止重定向，不刷新、撤销或修改凭据，不使用 Codex 客户端凭据。
+
+| 接口 | 实际结果 |
+|---|---|
+| https://auth.openai.com/api/accounts/oauth/userinfo | HTTP 200，application/json；原始字段结构仅 sub，没有图片地址 |
+| https://chatgpt.com/backend-api/me | HTTP 401，text/plain；未取得资料 |
+| https://chatgpt.com/backend-api/profiles/me | HTTP 401，text/plain；未取得资料 |
+
+结论限于本次凭据与请求方式：当前保存的 token 没有通过上述接口取得头像。UserInfo 接受了该 token，桌面资料接口拒绝了当前 Bearer 请求；不是由本地已过期凭据得出的判断。两个非 JSON 错误响应未提供可核实的结构化错误码，不把具体原因归结为 audience、scope 或某项客户端限制，也不推广为全部 SIWC 客户端永久不可访问。诊断只输出状态、字段结构和头像存在性，不保存个人资料或 token。
 
 ### Gravatar 说法核查
 

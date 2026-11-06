@@ -44,8 +44,8 @@ export class Accounts {
     return {
       active: vault?.active,
       accounts: (vault?.accounts ?? []).map(record => {
-        const { clientId, email, hasCredentials, planUsageAuthorized } = native.describeSession(record)
-        return { clientId, email, hasCredentials, planUsageAuthorized }
+        const { clientId, email, name, picture, hasCredentials, planUsageAuthorized } = native.describeSession(record)
+        return { clientId, email, name, picture, hasCredentials, planUsageAuthorized }
       }),
     }
   }

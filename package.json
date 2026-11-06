@@ -16,7 +16,8 @@
     "index.cjs",
     "index.d.cts",
     "*.node",
-    "SHADCN-LICENSE.md"
+    "SHADCN-LICENSE.md",
+    "OPENAI-BRAND.md"
   ],
   "dsh": {
     "bundle": {

@@ -35,3 +35,12 @@ test('local logout clears tokens and retains registration when remote revocation
 test('invalid host identifiers fail at the native boundary', async () => {
   await assert.rejects(new ChatGptClient({}).beginLogin('invalid-host', undefined, new Cancellation()), /host ID/)
 })
+
+test('account summaries expose optional profile data while older sessions remain readable', () => {
+  const previous = sessionRecord()
+  assert.equal(describeSession(previous).name == null, true)
+  const profile = describeSession(JSON.stringify({ ...JSON.parse(previous), name: 'Example User', picture: 'https://example.invalid/avatar.png' }))
+  assert.equal(profile.name, 'Example User')
+  assert.equal(profile.picture, 'https://example.invalid/avatar.png')
+  assert.equal('id_token' in profile, false)
+})

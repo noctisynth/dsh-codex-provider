@@ -4,6 +4,7 @@ import type {} from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type {} from "@deepseek-ai/dsh-client-ui-settings/client";
 import type {} from "@deepseek-ai/dsh-client-ui-plugin-manager/client";
 import { AccountSettings } from "./account-settings.tsx";
+import { OpenAiLogo } from "./openai-logo.tsx";
 import styles from "./styles.generated.css?inline";
 
 export const inject = ["slots", "connection"];
@@ -17,6 +18,9 @@ export function apply(ctx: Context): void {
     return () => style.remove();
   });
   const rpc = (ctx.get("connection") as ConnectionHandle).rpc;
+  ctx.slots.inject("settings.section.icon", () =>
+    ctx.slots.register({ name: "settings.section.icon", id: "codex-provider" }, OpenAiLogo),
+  );
   ctx.slots.inject("settings.section", () =>
     ctx.slots.register(
       {

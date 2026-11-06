@@ -32,6 +32,8 @@ pub struct AccountInfo {
     pub client_id: String,
     pub subject: String,
     pub email: Option<String>,
+    pub name: Option<String>,
+    pub picture: Option<String>,
     pub plan_usage_authorized: bool,
     pub has_credentials: bool,
 }
@@ -42,6 +44,8 @@ impl From<&auth::Session> for AccountInfo {
             client_id: session.client_id.clone(),
             subject: session.subject.clone(),
             email: session.email.clone(),
+            name: session.name.clone(),
+            picture: session.picture.clone(),
             plan_usage_authorized: session
                 .scopes
                 .iter()

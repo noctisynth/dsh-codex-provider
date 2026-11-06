@@ -9,6 +9,8 @@ pub(crate) struct Identity {
     pub issuer: String,
     pub subject: String,
     pub email: Option<String>,
+    pub name: Option<String>,
+    pub picture: Option<String>,
     pub id_token: String,
 }
 
@@ -43,6 +45,15 @@ pub(crate) fn identity(
         issuer: claims.issuer().as_str().into(),
         subject: claims.subject().as_str().into(),
         email: claims.email().map(|email| email.as_str().into()),
+        name: claims
+            .name()
+            .and_then(|name| name.get(None))
+            .map(|name| name.as_str().into()),
+        picture: claims
+            .picture()
+            .and_then(|picture| picture.get(None))
+            .filter(|url| url.as_str().starts_with("https://"))
+            .map(|url| url.as_str().into()),
         id_token: id_token.to_string(),
     })
 }

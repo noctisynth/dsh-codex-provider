@@ -62,6 +62,12 @@ pub(crate) async fn renew(http: &reqwest::Client, mut session: Session) -> Resul
         if identity.email.is_some() {
             session.email = identity.email;
         }
+        if identity.name.is_some() {
+            session.name = identity.name;
+        }
+        if identity.picture.is_some() {
+            session.picture = identity.picture;
+        }
     }
     apply_tokens(&mut session, &tokens)?;
     Ok(session)
@@ -91,6 +97,8 @@ mod tests {
             issuer: super::super::ISSUER.into(),
             subject: "test-subject".into(),
             email: Some("test@example.invalid".into()),
+            name: Some("Example User".into()),
+            picture: Some("https://example.invalid/avatar.png".into()),
             host_id: "test-host".into(),
             id_token: "previous-id-token".into(),
             nonce: "test-nonce".into(),

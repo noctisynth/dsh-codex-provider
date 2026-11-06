@@ -229,6 +229,8 @@ impl PendingLogin {
             issuer: identity.issuer,
             subject: identity.subject,
             email: identity.email,
+            name: identity.name,
+            picture: identity.picture,
             host_id: self.host_id.clone(),
             id_token: identity.id_token,
             nonce: self.nonce.secret().clone(),

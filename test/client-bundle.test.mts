@@ -46,6 +46,7 @@ test('the shipped settings preserve account actions, host React sharing and styl
     slots: { inject: (_name: string, mount: () => void) => mount(), register: (entry: typeof slots[number], value: typeof component) => { slots.push(entry); component = value } },
   })
   assert.ok(slots.some(entry => entry.name === 'settings.section' && entry.id === 'codex-provider'))
+  assert.ok(slots.some(entry => entry.name === 'settings.section.icon' && entry.id === 'codex-provider'))
   assert.ok(slots.some(entry => entry.name === 'plugins.bundle.config' && entry.key === 'dsh-codex-provider'))
   assert.ok(component)
   const Settings = component
@@ -60,10 +61,15 @@ test('the shipped settings preserve account actions, host React sharing and styl
   } finally { await act(async () => { view?.unmount() }) }
   assert.equal(requests.find(request => request.method.endsWith('/cancel'))?.payload, null)
   running = false
-  accounts = [{ clientId: 'synthetic-account', email: 'demo@example.com', hasCredentials: true, planUsageAuthorized: true }]
+  accounts = [{ clientId: 'synthetic-account', email: 'demo@example.com', name: 'Example User', picture: 'https://example.invalid/avatar.png', hasCredentials: true, planUsageAuthorized: true }]
   try {
     await act(async () => { view = create(createElement(Settings, { rpc, embedded: true }), { createNodeMock: element => element.type === 'dialog' ? { showModal() {} } : null }) })
     assert.ok(view)
+    assert.match(JSON.stringify(view.toJSON()), /Example User/)
+    const avatar = view.root.findByType('img')
+    assert.equal(avatar.props.referrerPolicy, 'no-referrer')
+    await act(async () => { avatar.props.onError() })
+    assert.equal(view.root.findAllByType('img').length, 0)
     const select = view.root.findAllByType('button').find(button => button.props.children === '切换账号')
     assert.ok(select)
     await act(async () => { await select.props.onClick() })

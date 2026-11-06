@@ -9,6 +9,10 @@ pub(crate) struct Session {
     pub issuer: String,
     pub subject: String,
     pub email: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub picture: Option<String>,
     pub host_id: String,
     pub id_token: String,
     pub nonce: String,

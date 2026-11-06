@@ -14,7 +14,7 @@ export interface LoginState {
 
 export interface AccountStatus {
   active?: string
-  accounts: Pick<AccountInfo, 'clientId' | 'email' | 'hasCredentials' | 'planUsageAuthorized'>[]
+  accounts: Pick<AccountInfo, 'clientId' | 'email' | 'name' | 'picture' | 'hasCredentials' | 'planUsageAuthorized'>[]
   login: LoginState
 }
 

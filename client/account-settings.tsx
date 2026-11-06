@@ -1,10 +1,12 @@
 import { useRef, useState, useId, useEffect } from "react";
-import { ArrowRight, Check, LoaderCircle, Plus, UserRound } from "lucide-react";
+import { ArrowRight, Check, LoaderCircle, Plus } from "lucide-react";
 import type { ClientConnectionRpc } from "@deepseek-ai/dsh-client-connection/client";
 import type { AccountStatus } from "../shared/account-ui.ts";
 import { useAccountSettings } from "./use-account-settings.ts";
 import { Button } from "./ui/button.tsx";
 import { Skeleton } from "./ui/skeleton.tsx";
+import { OpenAiLogo } from "./openai-logo.tsx";
+import { AccountAvatar } from "./account-avatar.tsx";
 
 type Account = AccountStatus["accounts"][number];
 
@@ -72,11 +74,16 @@ export function AccountSettings({
       className={`cp:box-border cp:[&_*]:box-border cp:w-full cp:max-w-3xl cp:text-sm cp:leading-relaxed cp:text-foreground cp:[&_button]:font-[inherit] ${embedded ? "cp:py-2" : "cp:py-4"}`}
     >
       <header className="cp:mb-7 cp:flex cp:flex-wrap cp:items-start cp:justify-between cp:gap-3">
-        <div>
-          <h2 className="cp:m-0 cp:text-lg cp:font-semibold cp:tracking-tight">ChatGPT</h2>
-          <p className="cp:mt-1 cp:mb-0 cp:text-sm cp:text-muted-foreground">
-            管理用于 Codex 模型的账号。
-          </p>
+        <div className="cp:flex cp:items-center cp:gap-3">
+          <div className="cp:flex cp:shrink-0 cp:items-center cp:justify-center cp:rounded-xl cp:bg-muted">
+            <OpenAiLogo size={48} />
+          </div>
+          <div>
+            <h2 className="cp:m-0 cp:text-lg cp:font-semibold cp:tracking-tight">ChatGPT</h2>
+            <p className="cp:mt-1 cp:mb-0 cp:text-sm cp:text-muted-foreground">
+              管理用于 Codex 模型的账号。
+            </p>
+          </div>
         </div>
         <Button
           size="sm"
@@ -118,21 +125,28 @@ export function AccountSettings({
               key={account.clientId}
               className="cp:flex cp:flex-wrap cp:items-center cp:gap-3 cp:border-0 cp:border-b cp:border-solid cp:border-border cp:py-5 cp:last:border-b-0"
             >
-              <div className="cp:flex cp:size-9 cp:shrink-0 cp:items-center cp:justify-center cp:rounded-full cp:bg-muted cp:text-muted-foreground">
-                <UserRound aria-hidden="true" className="cp:size-4" />
-              </div>
+              <AccountAvatar name={account.name} picture={account.picture} />
               <div className="cp:min-w-0 cp:flex-1">
-                <div className="cp:break-all cp:font-medium">{account.email ?? "ChatGPT 账号"}</div>
+                <div className="cp:flex cp:items-center cp:gap-2">
+                  <span className="cp:break-all cp:font-medium">
+                    {account.name || account.email || "ChatGPT 账号"}
+                  </span>
+                  {account.hasCredentials &&
+                    account.planUsageAuthorized &&
+                    status?.active === account.clientId && (
+                      <Check
+                        aria-label="当前使用"
+                        className="cp:size-3 cp:shrink-0 cp:text-muted-foreground"
+                      />
+                    )}
+                </div>
                 <div className="cp:mt-1 cp:flex cp:items-center cp:gap-1.5 cp:text-xs cp:text-muted-foreground">
-                  {account.hasCredentials && account.planUsageAuthorized && (
-                    <Check aria-hidden="true" className="cp:size-3" />
-                  )}
                   {!account.hasCredentials
                     ? "已退出 · 重新登录后可用"
                     : !account.planUsageAuthorized
                       ? "未授权模型使用权限"
-                      : status?.active === account.clientId
-                        ? "当前使用"
+                      : account.name && account.email
+                        ? account.email
                         : "已连接"}
                 </div>
               </div>

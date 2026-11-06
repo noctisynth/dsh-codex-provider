@@ -2,11 +2,14 @@ import { useRef, useState, useId, useEffect } from "react";
 import { ArrowRight, Check, LoaderCircle, Plus } from "lucide-react";
 import type { ClientConnectionRpc } from "@deepseek-ai/dsh-client-connection/client";
 import type { AccountStatus } from "../shared/account-ui.ts";
+import type { ConfigForm } from "@deepseek-ai/dsh-client-ui-settings/client";
+import type { SidebarPreference } from "../shared/sidebar-preference.ts";
 import { useAccountSettings } from "./use-account-settings.ts";
 import { Button } from "./ui/button.tsx";
 import { Skeleton } from "./ui/skeleton.tsx";
 import { OpenAiLogo } from "./openai-logo.tsx";
 import { AccountAvatar } from "./account-avatar.tsx";
+import { SidebarAccountPreference } from "./sidebar-account.tsx";
 
 type Account = AccountStatus["accounts"][number];
 
@@ -56,9 +59,11 @@ function LogoutConfirmation({
 
 export function AccountSettings({
   rpc,
+  preference,
   embedded,
 }: {
   rpc: ClientConnectionRpc;
+  preference: ConfigForm<SidebarPreference>;
   embedded: boolean;
 }) {
   const { status, busy, notice, error, act } = useAccountSettings(rpc);
@@ -270,6 +275,7 @@ export function AccountSettings({
       <p className="cp:mt-5 cp:mb-0 cp:text-xs cp:text-muted-foreground">
         模型与推理强度在对话的模型菜单中切换。
       </p>
+      <SidebarAccountPreference form={preference} />
       {logout && (
         <LogoutConfirmation
           account={logout}

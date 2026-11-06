@@ -5,9 +5,11 @@ import type {} from "@deepseek-ai/dsh-client-ui-settings/client";
 import type {} from "@deepseek-ai/dsh-client-ui-plugin-manager/client";
 import { AccountSettings } from "./account-settings.tsx";
 import { OpenAiLogo } from "./openai-logo.tsx";
+import { mountSidebarAccount } from "./sidebar-account.tsx";
+import type { SidebarPreference } from "../shared/sidebar-preference.ts";
 import styles from "./styles.generated.css?inline";
 
-export const inject = ["slots", "connection"];
+export const inject = ["slots", "connection", "configForms"];
 
 export function apply(ctx: Context): void {
   ctx.effect(() => {
@@ -18,6 +20,8 @@ export function apply(ctx: Context): void {
     return () => style.remove();
   });
   const rpc = (ctx.get("connection") as ConnectionHandle).rpc;
+  const preference = ctx.configForms.get<SidebarPreference>("codex-provider");
+  mountSidebarAccount(ctx, rpc, preference);
   ctx.slots.inject("settings.section.icon", () =>
     ctx.slots.register({ name: "settings.section.icon", id: "codex-provider" }, OpenAiLogo),
   );
@@ -28,7 +32,7 @@ export function apply(ctx: Context): void {
         id: "codex-provider",
         order: 15,
         label: () => "ChatGPT",
-        inject: () => ({ rpc, embedded: false }),
+        inject: () => ({ rpc, preference, embedded: false }),
       },
       AccountSettings,
     ),
@@ -38,7 +42,7 @@ export function apply(ctx: Context): void {
       {
         name: "plugins.bundle.config",
         key: "dsh-codex-provider",
-        inject: () => ({ rpc, embedded: true }),
+        inject: () => ({ rpc, preference, embedded: true }),
       },
       AccountSettings,
     ),

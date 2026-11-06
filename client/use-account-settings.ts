@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import type { ClientConnectionRpc } from "@deepseek-ai/dsh-client-connection/client";
 import type { AccountActions, AccountStatus } from "../shared/account-ui.ts";
 
+const accountStatusChanged = "codex-provider:accounts-changed";
+
 export function useAccountSettings(rpc: ClientConnectionRpc) {
   const [status, setStatus] = useState<AccountStatus | null>(null);
   const [busy, setBusy] = useState(false);
@@ -26,7 +28,9 @@ export function useAccountSettings(rpc: ClientConnectionRpc) {
         const value = await call("status", null, lifetime.signal);
         if (lifetime.signal.aborted) return;
         setStatus(value);
+        const completed = ownedLogin.current && !value.login.running;
         if (!value.login.running) ownedLogin.current = false;
+        if (completed) window.dispatchEvent(new Event(accountStatusChanged));
         if (value.login.running) timer = setTimeout(load, 700);
       } catch (error) {
         if (!lifetime.signal.aborted)
@@ -48,10 +52,13 @@ export function useAccountSettings(rpc: ClientConnectionRpc) {
     const visible = () => {
       if (document.visibilityState === "visible") resume();
     };
+    const changed = () => refresh((value) => value + 1);
     window.addEventListener("focus", resume);
+    window.addEventListener(accountStatusChanged, changed);
     document.addEventListener("visibilitychange", visible);
     return () => {
       window.removeEventListener("focus", resume);
+      window.removeEventListener(accountStatusChanged, changed);
       document.removeEventListener("visibilitychange", visible);
     };
   }, []);
@@ -84,7 +91,7 @@ export function useAccountSettings(rpc: ClientConnectionRpc) {
       setError(error instanceof Error ? error.message : "操作失败，请重试。");
     } finally {
       setBusy(false);
-      refresh((value) => value + 1);
+      window.dispatchEvent(new Event(accountStatusChanged));
     }
   }
   return { status, busy, notice, error, act };

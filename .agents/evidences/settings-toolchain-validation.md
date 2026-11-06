@@ -2,6 +2,16 @@
 
 编号：EVIDENCE-008。日期：2026-11-06。适用：DSH 0.2.2-rc.1、Windows x64、本项目开发产物。
 
+## 构建提示核查
+
+2026-11-06，按用户要求核对当前 tsdown 0.23.5、Rolldown 1.2.16 日志及官方文档。出现的提示分三类，未发现构建失败：
+
+- MODULE_LEVEL_DIRECTIVE：Lucide 的两个模块含 use client 指令，打包器不能保证保留模块边界语义。该指令用于 React Server Components；当前产物为 DSH 浏览器 closure factory、共享宿主 React 18，没有服务端组件边界。结合实际产物的加载与交互验证，判断这两条提示不影响当前运行。
+- deps.onlyBundle：未配置该可选检查时，tsdown 对内联第三方包显示建议。实际包为 Lucide、clsx、class-variance-authority、tailwind-merge 与 Radix Slot 所需模块，与既定 UI 构建相符；React 保持外置。不是已发现未知依赖的错误。
+- PLUGIN_TIMINGS：构建阶段插件回调的耗时诊断，最近一次为约 25 毫秒、占构建时间 1%；不能用它推断插件运行时性能。官方说明重叠异步回调可能只列名称，不提供可相加的耗时。
+
+本次保留现有日志和构建策略，没有为这些提示增加检查门禁、全局屏蔽警告或更换工具链。来源：https://react.dev/reference/rsc/use-client 、https://rolldown.rs/in-depth/directives 、https://tsdown.dev/options/dependencies#deps-onlybundle 、https://rolldown.rs/reference/InputOptions.checks#bundlertimings 。官方在线文档可能高于当前锁定版本；结论同时依据本次实际构建日志与产物测试。
+
 ## 调研依据
 
 参考社区插件公开发布包 3.2.6 的浏览器伴随声明、设置分区、插件配置面与受信 Connection 请求接入方式，没有复用其认证或推理协议实现。仅注册授权流不会自动提供这些界面入口。

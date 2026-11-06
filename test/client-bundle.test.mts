@@ -8,18 +8,20 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { clientRequestSchema } from '@deepseek-ai/dsh-client-connection'
 import type { ClientConnectionRpc } from '@deepseek-ai/dsh-client-connection/client'
 import type { AccountStatus } from '../shared/account-ui.ts'
+import type { ConfigForm, ConfigFormSnapshot, SettingsLauncherOwnerProps } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { SidebarPreference } from '../shared/sidebar-preference.ts'
 
 test('the shipped settings preserve account actions, host React sharing and stylesheet disposal', async () => {
   let loaded: { id: string; factory: (require: NodeRequire) => { apply(ctx: unknown): void } } | undefined
   const style = { dataset: {}, textContent: '', remove() { removed = true } }
   let removed = false
-  let dispose: (() => void) | undefined
+  const disposers: (() => void)[] = []
   const windowEvents = new EventTarget()
   const documentEvents = new EventTarget()
   runInNewContext(await readFile(new URL('../lib/client.js', import.meta.url), 'utf8'), {
-    AbortController, setTimeout, clearTimeout,
+    AbortController, Event, setTimeout, clearTimeout,
     document: { visibilityState: 'visible', addEventListener: documentEvents.addEventListener.bind(documentEvents), removeEventListener: documentEvents.removeEventListener.bind(documentEvents), createElement: () => style, head: { append(value: unknown) { assert.equal(value, style) } } },
-    window: { addEventListener: windowEvents.addEventListener.bind(windowEvents), removeEventListener: windowEvents.removeEventListener.bind(windowEvents), __ModuleLoader__: { load(value: typeof loaded) { loaded = value } } },
+    window: { dispatchEvent: windowEvents.dispatchEvent.bind(windowEvents), addEventListener: windowEvents.addEventListener.bind(windowEvents), removeEventListener: windowEvents.removeEventListener.bind(windowEvents), __ModuleLoader__: { load(value: typeof loaded) { loaded = value } } },
   })
   assert.ok(loaded)
   assert.equal(loaded.id, 'dsh-codex-provider')
@@ -28,22 +30,51 @@ test('the shipped settings preserve account actions, host React sharing and styl
     assert.ok(['react', 'react/jsx-runtime'].includes(name), `unexpected browser dependency: ${name}`)
     return hostRequire(name)
   }) as NodeRequire)
-  const slots: { name: string; id?: string; key?: string }[] = []
+  const slots: { name: string; id?: string; key?: string; priority?: number }[] = []
   const requests: { method: string; payload: unknown }[] = []
   let running = false
+  let active: string | undefined
   let accounts: AccountStatus['accounts'] = []
   const rpc: ClientConnectionRpc = { async call(_channel, method, payload) {
     requests.push({ method, payload })
     // Match Connection's JSON wire boundary and the Host's real envelope validator.
     clientRequestSchema.parse(JSON.parse(JSON.stringify({ type: 'client-request', rpcId: 'test', method, payload })))
     if (method.endsWith('/login')) running = true
-    return { ok: true, value: method.endsWith('/status') ? { accounts, login: { running } } : method.endsWith('/logout') ? { revocationConfirmed: false } : null }
+    return { ok: true, value: method.endsWith('/status') ? { active, accounts, login: { running } } : method.endsWith('/logout') ? { revocationConfirmed: false } : null }
   } }
-  let component: ComponentType<{ rpc: ClientConnectionRpc; embedded: boolean }> | undefined
+  const listeners = new Set<() => void>()
+  let snapshot: ConfigFormSnapshot<SidebarPreference> = { status: 'ready', value: { sidebarAccount: 'deepseek' }, writable: true, base: {}, user: {}, revision: 1 }
+  const preference: ConfigForm<SidebarPreference> = {
+    getSnapshot: () => snapshot,
+    subscribe(listener) { listeners.add(listener); return () => { listeners.delete(listener) } },
+    async set(field, value) {
+      assert.equal(field, 'sidebarAccount')
+      assert.ok(value === 'deepseek' || value === 'chatgpt')
+      snapshot = { ...snapshot, value: { sidebarAccount: value } }
+      listeners.forEach(listener => listener())
+      return true
+    },
+    unset: async () => assert.fail('unexpected unset'),
+    mutate: async () => assert.fail('unexpected mutation'),
+  }
+  type SettingsProps = { rpc: ClientConnectionRpc; preference: ConfigForm<SidebarPreference>; embedded: boolean }
+  type LauncherProps = SettingsLauncherOwnerProps & { rpc: ClientConnectionRpc }
+  let component: ComponentType<SettingsProps> | undefined
+  let launcher: ComponentType<LauncherProps> | undefined
   plugin.apply({
-    effect: (mount: () => () => void) => { dispose = mount() },
+    effect: (mount: () => () => void) => { disposers.push(mount()) },
     get: () => ({ rpc }),
-    slots: { inject: (_name: string, mount: () => void) => mount(), register: (entry: typeof slots[number], value: typeof component) => { slots.push(entry); component = value } },
+    configForms: { get: (id: string) => { assert.equal(id, 'codex-provider'); return preference } },
+    slots: { inject: (_name: string, mount: () => () => void) => { disposers.push(mount()) }, register: (entry: typeof slots[number], value: ComponentType<SettingsProps> | ComponentType<LauncherProps>) => {
+      slots.push(entry)
+      if (entry.name === 'settings.launcher') {
+        assert.equal(entry.priority, -1)
+        launcher = value as ComponentType<LauncherProps>
+        return () => { launcher = undefined }
+      }
+      if (entry.name === 'plugins.bundle.config') component = value as ComponentType<SettingsProps>
+      return () => {}
+    } },
   })
   assert.ok(slots.some(entry => entry.name === 'settings.section' && entry.id === 'codex-provider'))
   assert.ok(slots.some(entry => entry.name === 'settings.section.icon' && entry.id === 'codex-provider'))
@@ -52,7 +83,7 @@ test('the shipped settings preserve account actions, host React sharing and styl
   const Settings = component
   let view: ReactTestRenderer | undefined
   try {
-    await act(async () => { view = create(createElement(Settings, { rpc, embedded: false })) })
+    await act(async () => { view = create(createElement(Settings, { rpc, preference, embedded: false })) })
     assert.ok(view)
     const button = view.root.findAllByType('button').find(button => button.props['aria-label'] === '使用 ChatGPT 登录')
     assert.ok(button)
@@ -63,7 +94,7 @@ test('the shipped settings preserve account actions, host React sharing and styl
   running = false
   accounts = [{ clientId: 'synthetic-account', email: 'demo@example.com', name: 'Example User', picture: 'https://example.invalid/avatar.png', gravatarPicture: 'https://example.invalid/gravatar.png', hasCredentials: true, planUsageAuthorized: true }]
   try {
-    await act(async () => { view = create(createElement(Settings, { rpc, embedded: true }), { createNodeMock: element => element.type === 'dialog' ? { showModal() {} } : null }) })
+    await act(async () => { view = create(createElement(Settings, { rpc, preference, embedded: true }), { createNodeMock: element => element.type === 'dialog' ? { showModal() {} } : null }) })
     assert.ok(view)
     assert.match(JSON.stringify(view.toJSON()), /Example User/)
     const avatar = view.root.findByType('img')
@@ -105,7 +136,43 @@ test('the shipped settings preserve account actions, host React sharing and styl
     assert.match(JSON.stringify(view.toJSON()), /重新登录后可用/)
     assert.doesNotMatch(JSON.stringify(view.toJSON()), /当前使用|synthetic-account|注册信息/)
   } finally { await act(async () => { view?.unmount() }) }
+  let sidebar: ReactTestRenderer | undefined
+  accounts = accounts.map(account => ({ ...account, name: 'Sidebar User', hasCredentials: true }))
+  active = accounts[0].clientId
+  try {
+    await act(async () => { view = create(createElement(Settings, { rpc, preference, embedded: false }), { createNodeMock: element => element.type === 'dialog' ? { showModal() {} } : null }) })
+    assert.equal(launcher, undefined)
+    const chatgpt = view!.root.findAllByType('button').find(button => button.props.children === 'ChatGPT')
+    assert.ok(chatgpt)
+    await act(async () => { await chatgpt.props.onClick() })
+    assert.equal(snapshot.value?.sidebarAccount, 'chatgpt')
+    assert.ok(launcher)
+    let opened = 0
+    const owner: LauncherProps = { rpc, wide: true, settingsOpen: false, openSettings: () => { opened++ }, openOnboarding: () => assert.fail('unexpected onboarding') }
+    await act(async () => { sidebar = create(createElement(launcher!, owner)) })
+    assert.match(JSON.stringify(sidebar!.toJSON()), /Sidebar User/)
+    await act(async () => { sidebar!.root.findByType('button').props.onClick() })
+    assert.equal(opened, 1)
+    await act(async () => { sidebar!.update(createElement(launcher!, { ...owner, wide: false })) })
+    assert.equal(sidebar!.root.findByType('button').props.title, 'Sidebar User · 设置')
+    const logout = view!.root.findAllByType('button').find(button => button.props.children === '退出登录')
+    assert.ok(logout)
+    await act(async () => { logout.props.onClick() })
+    const confirm = view!.root.findAllByType('button').find(button => button.props.children === '确认退出')
+    assert.ok(confirm)
+    accounts = accounts.map(account => ({ ...account, hasCredentials: false }))
+    await act(async () => { await confirm.props.onClick() })
+    assert.equal(sidebar!.root.findByType('button').props.title, 'ChatGPT · 设置')
+    const deepseek = view!.root.findAllByType('button').find(button => button.props.children === 'DeepSeek')
+    assert.ok(deepseek)
+    await act(async () => { await deepseek.props.onClick() })
+    assert.equal(launcher, undefined)
+    await act(async () => { await preference.set('sidebarAccount', 'chatgpt') })
+    assert.ok(launcher)
+  } finally { await act(async () => { sidebar?.unmount(); view?.unmount() }) }
   assert.match(style.textContent, /--cp-spacing/)
-  dispose?.()
+  disposers.reverse().forEach(dispose => dispose())
   assert.equal(removed, true)
+  assert.equal(launcher, undefined)
+  assert.equal(listeners.size, 0)
 })

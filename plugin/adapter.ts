@@ -8,6 +8,17 @@ import type { Operations } from './operations.ts'
 
 export const provider = 'openai-codex'
 
+const reasoningEffortNames = new Map([
+  ['none', '无'],
+  ['minimal', '极低'],
+  ['low', '轻度'],
+  ['medium', '中'],
+  ['high', '高'],
+  ['xhigh', '极高'],
+  ['max', 'Max'],
+  ['ultra', 'Ultra'],
+])
+
 export class ChatGptAdapter extends LlmAdapter {
   client: ChatGptClient
   accounts: Accounts
@@ -67,7 +78,11 @@ export class ChatGptAdapter extends LlmAdapter {
         .map(({ reasoning, ...model }) => ({
           provider, ...model, inputModalities: ['text'] as const,
           ...(reasoning ? { reasoning: {
-            efforts: reasoning.efforts.map(effort => ({ ...effort, id: ReasoningEffortId(effort.id) })),
+            efforts: reasoning.efforts.map(effort => ({
+              ...effort,
+              id: ReasoningEffortId(effort.id),
+              name: reasoningEffortNames.get(effort.id) ?? effort.name,
+            })),
             ...(reasoning.defaultEffort === undefined ? {} : { defaultEffort: ReasoningEffortId(reasoning.defaultEffort) }),
           } } : {}),
         }))

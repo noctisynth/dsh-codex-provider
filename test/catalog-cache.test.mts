@@ -35,7 +35,10 @@ test('catalog metadata drives effort selection and shares reads across lookup an
     if (fail) throw new Error('catalog unavailable')
     if (gate) await gate
     return [{ id: 'model-a', name: 'Model A', reasoning: {
-      defaultEffort: 'low', efforts: [{ id: 'low', name: 'low' }, { id: 'high', name: 'high' }],
+      defaultEffort: 'low', efforts: [
+        ...['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra'].map(id => ({ id, name: id })),
+        { id: 'future-level', name: 'Future display name', description: 'Provider description' },
+      ],
     } }, { id: 'model-b', name: 'Model B' }]
   }
   const operations = new Operations()
@@ -48,7 +51,13 @@ test('catalog metadata drives effort selection and shares reads across lookup an
     assert.deepEqual(first.map(model => model.id), ['model-a', 'model-b'])
     await adapter.listModels()
     const route = { provider: 'openai-codex', model: 'model-a' }
-    assert.equal((await ctx.llm.resolveModelInfo(route.provider, route.model)).reasoning?.efforts[1].id, 'high')
+    const reasoning = (await ctx.llm.resolveModelInfo(route.provider, route.model)).reasoning
+    assert.deepEqual(reasoning?.efforts.map(({ id, name }) => [id, name]), [
+      ['none', '无'], ['minimal', '极低'], ['low', '轻度'], ['medium', '中'],
+      ['high', '高'], ['xhigh', '极高'], ['max', 'Max'], ['ultra', 'Ultra'],
+      ['future-level', 'Future display name'],
+    ])
+    assert.equal(reasoning?.efforts.at(-1)?.description, 'Provider description')
     assert.equal((await ctx.llm.resolveCallConfig(route)).reasoningEffort, 'low')
     assert.equal((await ctx.llm.resolveCallConfig({ ...route, reasoningEffort: ReasoningEffortId('high') })).reasoningEffort, 'high')
     assert.equal((await ctx.llm.resolveModelInfo(route.provider, 'model-b')).reasoning, undefined)

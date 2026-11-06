@@ -16,7 +16,6 @@ const reasoningEffortNames = new Map([
   ['high', '高'],
   ['xhigh', '极高'],
   ['max', 'Max'],
-  ['ultra', 'Ultra'],
 ])
 
 export class ChatGptAdapter extends LlmAdapter {

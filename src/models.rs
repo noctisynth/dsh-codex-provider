@@ -45,18 +45,26 @@ pub(crate) fn parse_catalog(json: &[u8]) -> Result<Vec<Model>, Error> {
         .models
         .into_iter()
         .filter(|model| model.visibility == "list")
-        .map(|model| Model {
-            id: model.slug,
-            name: model.display_name,
-            context_window: model.context_window,
-            reasoning: if model.supported_reasoning_levels.is_empty() {
-                None
-            } else {
-                Some(Reasoning {
-                    efforts: model.supported_reasoning_levels,
-                    default_effort: model.default_reasoning_level,
-                })
-            },
+        .map(|mut model| {
+            // Ultra requires Codex multi-agent orchestration, not a Responses effort.
+            model
+                .supported_reasoning_levels
+                .retain(|effort| effort.id != "ultra");
+            Model {
+                id: model.slug,
+                name: model.display_name,
+                context_window: model.context_window,
+                reasoning: if model.supported_reasoning_levels.is_empty() {
+                    None
+                } else {
+                    Some(Reasoning {
+                        efforts: model.supported_reasoning_levels,
+                        default_effort: model
+                            .default_reasoning_level
+                            .filter(|effort| effort != "ultra"),
+                    })
+                },
+            }
         })
         .collect())
 }
@@ -95,7 +103,7 @@ mod tests {
     }
 
     #[test]
-    fn reasoning_levels_preserve_server_values_order_and_default() -> Result<(), crate::error::Error>
+    fn reasoning_levels_exclude_ultra_and_preserve_other_values() -> Result<(), crate::error::Error>
     {
         let models = parse_catalog(
             br#"{"models":[{
@@ -103,8 +111,18 @@ mod tests {
             "default_reasoning_level":"low",
             "supported_reasoning_levels":[
                 {"effort":"low","description":"Lighter reasoning"},
-                {"effort":"future-level","description":"Provider-defined effort"}
+                {"effort":"ultra","description":"Codex multi-agent orchestration"},
+                {"effort":"future-level","description":"Provider-defined effort"},
+                {"effort":"max","description":"Maximum reasoning"}
             ]
+        },{
+            "slug":"ultra-default","display_name":"Ultra default","visibility":"list",
+            "default_reasoning_level":"ultra",
+            "supported_reasoning_levels":[{"effort":"ultra"},{"effort":"high"}]
+        },{
+            "slug":"ultra-only","display_name":"Ultra only","visibility":"list",
+            "default_reasoning_level":"ultra",
+            "supported_reasoning_levels":[{"effort":"ultra"}]
         }]}"#,
         )?;
         let reasoning = models[0]
@@ -118,12 +136,26 @@ mod tests {
                 .iter()
                 .map(|effort| effort.id.as_str())
                 .collect::<Vec<_>>(),
-            ["low", "future-level"]
+            ["low", "future-level", "max"]
         );
         assert_eq!(
             reasoning.efforts[1].description.as_deref(),
             Some("Provider-defined effort")
         );
+        let ultra_default = models[1]
+            .reasoning
+            .as_ref()
+            .ok_or(crate::error::Error::Protocol("Missing test reasoning"))?;
+        assert_eq!(ultra_default.default_effort, None);
+        assert_eq!(
+            ultra_default
+                .efforts
+                .iter()
+                .map(|effort| effort.id.as_str())
+                .collect::<Vec<_>>(),
+            ["high"]
+        );
+        assert_eq!(models[2].reasoning, None);
         Ok(())
     }
 

@@ -55,3 +55,15 @@
 按用户反馈统一三项为 DSH 通用设置行的层级、间距和右侧控件。账号与搜索采用同一 Radix/shadcn 单选下拉，审批采用 Switch，保留 Tailwind 主题隔离。Switch 契约依据 [Radix 官方文档](https://www.radix-ui.com/primitives/docs/components/switch)，构建依赖版本由锁文件记录。Button 补齐 React 18 的 forwardRef，使 Radix 触发器可以正确定位和恢复焦点。
 
 更新后的 20 项 Node 测试、两套 tsrs 类型检查及 Tailwind/tsdown 构建通过。独立无界面浏览器使用最终产物验证三档搜索选择、审批开关、侧边栏双向恢复、文件占用提示及成功重试后的提示清除；深浅主题、320 像素容器均未观察到溢出，浏览器错误为空。此次只改 TypeScript 与 UI，不重建未更改的 Rust 模块。新布局与错误提示的桌面安装和用户验收尚待完成。
+
+## 会话权限菜单调整的接口限制
+
+用户进一步要求设置只控制入口显示，在会话权限菜单选择独立的 ChatGPT 审批模式。本次已安装实现只答复真实 approval/request；完全权限的 never 策略不会因开关而转为全量审批，原实验 Auto 会跳过新增答复者。不过全局开关的交互语义仍不符合新增的会话级选择目标。
+
+核对目标 0.2.2-rc.1 的 PermissionPresetService 公开声明和运行实现：动态贡献只有 registerAuto，固定绑定保留的 auto 身份及完全权限语义，不接受通用 preset ID 或自定义沙箱组合；同时只允许一个 Auto 贡献者。静态 Config.presets 可定义自定义组合，但不是 volatile 字段，变更需要重载权限服务；Profile 补丁的 config 整体替换，不能当作无副作用的 UI 显示开关。没有采用覆盖现有 Auto、直接改私有预设表或替换宿主方法的方式。
+
+已将“仅插件内的会话级审批开关”和“扩展宿主通用注册接口后增加并列模式”提交用户选择。在决定前暂停安装现有界面更新；尚未实现或验证新会话模式，不把静态预设支持解释为动态注册已可用。
+
+后续用户询问接管官方 Auto：其 classifyRisk 使用公开 LLM 请求并标记 purpose=auto-review，路由实验可将 DeepSeek、MiniMax 的审查交给 ChatGPT；但官方工具前置门禁、完全权限和逐次审查语义均保留，不能满足保留沙箱和仅必要审批的边界。用户据此决定暂时保持现状，未实施请求接管或新会话控件。
+
+再次核对当前产品：会话 current preset 为 auto 时，新增审批答复者在生成上下文和调用模型之前执行 next；官方 Auto 仍使用其 snapshot 的会话 Provider 和模型。产品未注册 auto-review LLM 请求重定向。故同时开启不因本插件重复产生审查推理调用；官方 Auto 本身仍有审查 token 消耗，归属于其实际模型路线。此前合成集成覆盖 auto 时新增模型调用数不变；该结论不等于已单独完成两插件同时开启的真实桌面组合验收。

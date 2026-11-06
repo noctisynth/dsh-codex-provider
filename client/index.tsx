@@ -15,7 +15,7 @@ function AccountSettings({ rpc, embedded }: { rpc: ClientConnectionRpc; embedded
   const [error, setError] = useState('')
   const ownedLogin = useRef(false)
 
-  const call = async <A extends keyof AccountActions>(action: A, payload?: { id: string } | null, signal?: AbortSignal): Promise<AccountActions[A]> => {
+  const call = async <A extends keyof AccountActions>(action: A, payload: { id: string } | null = null, signal?: AbortSignal): Promise<AccountActions[A]> => {
     const result = await rpc.call('/api', `codex-provider/${action}`, payload, signal)
     if (!result.ok) throw new Error(result.error.message)
     return result.value as AccountActions[A]

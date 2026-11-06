@@ -8,6 +8,10 @@ pub(crate) struct Transport {
 }
 
 impl Transport {
+    pub(crate) fn client(&self) -> &reqwest::Client {
+        &self.client
+    }
+
     pub fn new() -> Result<Self, Error> {
         let client = reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())

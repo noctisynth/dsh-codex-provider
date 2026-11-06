@@ -1,1 +1,7 @@
 .inspection/
+node_modules/
+target/
+*.node
+/index.js
+/index.d.ts
+/npm/

@@ -8,6 +8,14 @@
 
 实际 DSH 安装内的 experimental-auto-review 发布实现使用固定 REVIEW_POLICY，将请求标记为 purpose=auto-review，通过 LlmRuntime 调用当前模型。宿主负责收集待执行操作和上下文，严格解析 risk/decision JSON，执行允许、拒绝与错误路径。DSH 接口已经有明确 purpose，不需要照搬社区的提示前缀识别。此为静态发布实现观察，不是完整用户授权流程验收。
 
+## 当前桌面入口的启用条件
+
+后续用户反馈会话权限菜单只有仅可查看、工作区内修改、完全权限。核对实际安装包：官方实验包名称为 @deepseek-ai/dsh-experimental-auto-review，版本 0.2.2-rc.1，提供独立 bundle 补丁并在 apply 时调用 permissionPresets.registerAuto。权限服务仅在该注册存活时把 auto 添加至当前会话的可选模式；不会添加到全局默认模式列表。
+
+当前 desktop 配置声明的 bundle 为基础包、web-app 和本插件，没有声明该实验包。本插件也没有加载自动审查组件，因此菜单缺少 Auto 与当前状态相符。已安装分发包内存在源码不等于组件已启用；此前仅说明“DSH 已有实现”不足以指导用户找到入口，需要补充此条件。未安装实验包、未修改权限或自动审批设置。
+
+该组件默认通过当前会话路由审查；本插件提供 codex-auto-review 专用路由是独立的增强。仅增加模型路由不会使缺失的 Auto 权限入口出现。正式启用仍需宿主组件加载、会话选择与实际审查集成验证。
+
 ## 现有授权实测
 
 GET https://api.openai.com/v1/models 返回 200，目录确实包含 visibility=hide 的 codex-auto-review；所测目录没有 auto_review_model_override，审查模型支持 low。隐藏只表示不进入普通模型列表，实际能否调用另做验证。

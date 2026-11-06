@@ -1,5 +1,5 @@
-import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { test } from 'node:test'
 import type { Context as CordisContext } from '@deepseek-ai/cordis'
 import type { HostConnectionHandle } from '@deepseek-ai/dsh-client-connection'
 
@@ -9,16 +9,26 @@ test('Cordis mounts the authorization flow and provider, then releases both on d
   const { AuthorizationService } = await import('@deepseek-ai/dsh-authorization')
   const plugin = await import('../plugin/index.ts')
   class MemoryCredentials extends Service {
-    constructor(ctx: CordisContext) { super(ctx, 'credentials') }
-    async readRecord() { return undefined }
+    constructor(ctx: CordisContext) {
+      super(ctx, 'credentials')
+    }
+    async readRecord() {
+      return undefined
+    }
   }
   const ctx = new Context()
   ctx.provide('attachments', {} as never)
   const routes = new Set<string>()
-  ctx.provide('connection', { fetch: { register(route) {
-    routes.add(route.path)
-    return () => { routes.delete(route.path) }
-  } } } as HostConnectionHandle)
+  ctx.provide('connection', {
+    fetch: {
+      register(route) {
+        routes.add(route.path)
+        return () => {
+          routes.delete(route.path)
+        }
+      },
+    },
+  } as HostConnectionHandle)
   const credentials = ctx.plugin(MemoryCredentials)
   const llm = ctx.plugin(LlmRuntime)
   const authorization = ctx.plugin(AuthorizationService)

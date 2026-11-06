@@ -10,9 +10,9 @@
 
 浏览器侧按 DSH 的 dsh.client 声明和模块加载契约提供设置分区，以及插件详情配置面；复用正常模型选择器，不替换模型选择组件。界面通过宿主受信 connection 的 RPC 请求登录、账号切换、退出和安全状态，使用宿主 schema 校验 RPC 信封；后端只返回账号摘要及授权交互，不返回凭据或授权 URL。取消与卸载关闭等待中的授权交互。
 
-侧边栏展示偏好采用宿主 Config 的 volatile 字段 sidebarAccount，默认 DeepSeek，使用 configForms 订阅和写入，不自行实现持久化。选中 ChatGPT 时以优先级 -1 注册 settings.launcher，切回或插件卸载时释放注册，恢复原组件。入口遵循宿主 wide 状态，复用账号头像，显示活动且有凭据的账号；无活动登录时显示 ChatGPT 登录提示。入口展开 shadcn/Radix DropdownMenu 的最小菜单，设置项调用公开 openSettings，恢复项写入既有偏好，退出项复用既有确认弹窗和接口。不调用宿主内部导航或复制 DeepSeek 认证菜单。账号操作完成后通知同一浏览器中的入口刷新，恢复窗口焦点时也读取最新摘要。契约及限制见 EVIDENCE-015。
+侧边栏展示偏好采用宿主 Config 的 volatile 字段 sidebarAccount，默认 DeepSeek，使用 configForms 订阅，经受信 RPC 交宿主 Settings 写入，不自行实现持久化。选中 ChatGPT 时以优先级 -1 注册 settings.launcher，切回或插件卸载时释放注册，恢复原组件。入口遵循宿主 wide 状态，复用账号头像，显示活动且有凭据的账号；无活动登录时显示 ChatGPT 登录提示。入口展开 shadcn/Base UI Menu 的最小菜单，设置项调用公开 openSettings，恢复项写入既有偏好，退出项复用既有确认弹窗和接口。不调用宿主内部导航或复制 DeepSeek 认证菜单。账号操作完成后通知同一浏览器中的入口刷新，恢复窗口焦点时也读取最新摘要。契约及限制见 EVIDENCE-015。
 
-菜单 Portal 使用宿主同一 React DOM 运行时，构建保持 react-dom 外置；复用 DropdownMenu 的定位、键盘、关闭及焦点管理。触发器直接应用现有 Button 样式，避免 React 18 下普通函数 Button 无法接收 Radix ref。菜单关闭后打开退出确认时协调焦点，不新增第二套退出逻辑。
+菜单 Portal 使用宿主同一 React DOM 运行时，构建保持 react-dom 外置；复用 DropdownMenu 的定位、键盘、关闭及焦点管理。触发器直接应用现有 Button 样式，避免 React 18 下普通函数 Button 无法接收触发器 ref。菜单关闭后打开退出确认时协调焦点，不新增第二套退出逻辑。
 
 侧边栏展开入口采用宿主原有的 44 像素行高、6 像素内边距、8 像素图文间距和 24 像素头像，姓名 14 像素、次要信息 12 像素；折叠入口为 36 像素方形。复用宿主圆角和悬停色，不增加卡片容器。设置切换复用小尺寸 Button。
 
@@ -60,13 +60,17 @@ Rust 按认证、请求及流式事件、绑定边界划分模块；按实际职
 
 ## 官方协议与依赖
 
+工程治理保持认证、推理协议和用户流程不变。Rust 原生绑定的返回类型与转换独立于客户端操作，继续使用一个 crate；TypeScript 将模型元数据映射和偏好校验、搜索来源协调分开，避免在适配器或路由内堆叠转换细节。Biome 统一自有 TS/TSX、测试及配置格式与基础 lint，排除生成绑定、生成样式、构建产物及实验目录；启用 Tailwind 4 指令解析和项目样式入口，不另加并行格式化工具。
+
+UI 封装迁移至 Base UI 的 Button、Menu、Select 与 Switch，保持 React 18、宿主 React 共享及 Tailwind 前缀隔离；移除不再使用的直接 Radix 依赖。组件负责定位、选择、焦点与键盘行为，宿主模态框中的 Portal 仍归属于触发器所在弹窗。shadcn 派生样式的 MIT 许可放在组件目录并纳入包清单；使用 CLI 不改变许可保留义务。依据与验证见 EVIDENCE-025。
+
 本次落地为默认关闭的 codexReview 和三档 searchMode，复用配置表单和紧凑 shadcn Button。审批关闭交给原 answerer；开启时在 approval/request 前置答复，仅生成当前请求的 allowed-once/rejected/cancelled/unavailable。使用会话当前 step、精确 call ID、工具参数与上下文形成独立审查请求；不把工具输出当作用户授权。原实验 Auto 模式不叠加第二次审批。账号轮换与取消继续复用已有模块，审查模型目录资料独立于普通模型列表。
 
 用户已决定暂时保留现有审批开关。选择原实验 Auto 的会话由宿主原有审查链路负责，本插件在生成审查上下文或请求模型前直接交给后续答复者；不把官方 Auto 请求重定向至专用 ChatGPT 审查模型，也不额外重复审查。
 
 设置说明以账号显示、需要用户确认的操作、搜索范围及账号用量描述行为；审批说明直接交代官方 Auto 的模型归属和不叠加审查调用。不改变开关语义或审查触发逻辑。
 
-三个偏好项共用设置行的间距、分隔线、字号与标题说明层级，对齐 DSH 本体的通用设置：纵向内边距 16 像素，标题 14 像素，说明 12 像素，控件右对齐。账号和搜索使用 Radix/shadcn Select，审批使用 Radix/shadcn Switch，样式继续使用 Tailwind。Select 的 Portal 挂载到触发器所属 dialog 内；普通页面沿用默认挂载位置，Escape 关闭列表而不继续关闭宿主弹窗。共享一个偏好保存状态与逐项错误提示，账号菜单仍调用同一保存接口。Windows rename 的占用或权限错误返回明确配置错误码与安全提示，不暴露底层路径，不追加重试或降级为非原子写入。
+三个偏好项共用设置行的间距、分隔线、字号与标题说明层级，对齐 DSH 本体的通用设置：纵向内边距 16 像素，标题 14 像素，说明 12 像素，控件右对齐。账号和搜索使用 Base UI/shadcn Select，审批使用 Base UI/shadcn Switch，样式继续使用 Tailwind。Select 的 Portal 挂载到触发器所属 dialog 内；普通页面沿用默认挂载位置，Escape 关闭列表而不继续关闭宿主弹窗。共享一个偏好保存状态与逐项错误提示，账号菜单仍调用同一保存接口。Windows rename 的占用或权限错误返回明确配置错误码与安全提示，不暴露底层路径，不追加重试或降级为非原子写入。
 
 searchMode 为 off、chatgpt、all。非关闭时普通 ChatGPT 对话启用官方内置 web_search，辅助审查、摘要与标题请求不附带搜索。all 额外注册正式 DSH 搜索源，以服务端目录顺序的首个可见 ChatGPT 模型执行一次仅搜索请求，返回摘要和真实来源。原生层发送内置工具、保留搜索 output 项，并把 URL 引用转换为可点击来源；不把远端搜索误作待宿主执行的函数调用。共享源使用公开 Settings/ConfigEditor 选择并保存可恢复的原来源，不更改其它模型适配器；离开 all 或卸载时仅在当前仍选择本源时恢复，不覆盖用户后来手动选择的其它来源。
 

@@ -1,5 +1,5 @@
-import { LlmError, ProviderRequestId } from '@deepseek-ai/dsh-llm'
 import type { StreamChunk } from '@deepseek-ai/dsh-llm'
+import { LlmError, ProviderRequestId } from '@deepseek-ai/dsh-llm'
 
 interface ProviderFailure {
   kind: 'api' | 'auth' | 'transport' | 'timeout' | 'protocol' | 'cancelled'

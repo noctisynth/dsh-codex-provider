@@ -1,4 +1,4 @@
-import type { Context, Volatile, Fiber } from '@deepseek-ai/cordis'
+import type { Context, Fiber, Volatile } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-config-editor'
 import type {} from '@deepseek-ai/dsh-settings'
 import type {} from '@deepseek-ai/dsh-web'
@@ -20,9 +20,13 @@ export class Preferences {
   }
 
   private namespace(name?: string): string {
-    const entry = this.ctx.configEditor.entries().find(entry => name
-      ? entry.options.name === name || entry.options.name === `cordis:${name}`
-      : entry.fiber?.uid === this.owner.uid)
+    const entry = this.ctx.configEditor
+      .entries()
+      .find((entry) =>
+        name
+          ? entry.options.name === name || entry.options.name === `cordis:${name}`
+          : entry.fiber?.uid === this.owner.uid,
+      )
     if (!entry?.options.id) throw new Error('找不到可编辑的宿主配置。')
     return entry.options.id
   }
@@ -34,27 +38,38 @@ export class Preferences {
   }
 
   private async write(payload: unknown): Promise<void> {
-    if (!payload || typeof payload !== 'object' || !('key' in payload) || !('value' in payload)) throw new Error('设置参数无效。')
-    const { key, value } = payload
-    if (!(key === 'sidebarAccount' && (value === 'deepseek' || value === 'chatgpt')
-      || key === 'codexReview' && typeof value === 'boolean'
-      || key === 'searchMode' && typeof value === 'string' && ['off', 'chatgpt', 'all'].includes(value))) throw new Error('设置值无效。')
+    const { key, value } = parsePreference(payload)
     const ns = this.namespace()
-    if (key !== 'searchMode') { await this.ctx.settings.update(ns, { [key]: value }); return }
-    const current = this.ctx.settings.describe().find(row => row.ns === ns)?.value as { searchMode?: SearchMode } | undefined
+    if (key !== 'searchMode') {
+      await this.ctx.settings.update(ns, { [key]: value })
+      return
+    }
+    const current = this.ctx.settings.describe().find((row) => row.ns === ns)?.value as
+      | { searchMode?: SearchMode }
+      | undefined
     const wasAll = current?.searchMode === 'all'
     if (value === 'all' && !wasAll) {
       const webNs = this.namespace('@deepseek-ai/dsh-web')
-      const web = this.ctx.settings.describe().find(row => row.ns === webNs)?.value as { searchProvider?: string }
+      const web = this.ctx.settings.describe().find((row) => row.ns === webNs)?.value as {
+        searchProvider?: string
+      }
       const old = web.searchProvider ?? ''
       await this.ctx.settings.update(webNs, { searchProvider: searchProviderId })
-      try { await this.ctx.settings.update(ns, { searchMode: value, previousSearchProvider: old }) }
-      catch (error) { await this.restoreSource(old); throw error }
+      try {
+        await this.ctx.settings.update(ns, { searchMode: value, previousSearchProvider: old })
+      } catch (error) {
+        await this.restoreSource(old)
+        throw error
+      }
     } else {
-      const restored = wasAll && value !== 'all' && await this.restoreSource(this.previous.get())
-      try { await this.ctx.settings.update(ns, { searchMode: value }) }
-      catch (error) {
-        if (restored) await this.ctx.settings.update(this.namespace('@deepseek-ai/dsh-web'), { searchProvider: searchProviderId })
+      const restored = wasAll && value !== 'all' && (await this.restoreSource(this.previous.get()))
+      try {
+        await this.ctx.settings.update(ns, { searchMode: value })
+      } catch (error) {
+        if (restored)
+          await this.ctx.settings.update(this.namespace('@deepseek-ai/dsh-web'), {
+            searchProvider: searchProviderId,
+          })
         throw error
       }
     }
@@ -62,16 +77,48 @@ export class Preferences {
 
   async selectSource(): Promise<void> {
     const ns = this.namespace('@deepseek-ai/dsh-web')
-    const current = this.ctx.settings.describe().find(row => row.ns === ns)?.value as { searchProvider?: string }
-    if ((current?.searchProvider ?? '') === (this.previous.get() ?? '')) await this.ctx.settings.update(ns, { searchProvider: searchProviderId })
+    const current = this.ctx.settings.describe().find((row) => row.ns === ns)?.value as {
+      searchProvider?: string
+    }
+    if ((current?.searchProvider ?? '') === (this.previous.get() ?? ''))
+      await this.ctx.settings.update(ns, { searchProvider: searchProviderId })
   }
 
   async restoreSource(previous = this.previous.get()): Promise<boolean> {
     const ns = this.namespace('@deepseek-ai/dsh-web')
-    const current = this.ctx.settings.describe().find(row => row.ns === ns)?.value as { searchProvider?: string }
+    const current = this.ctx.settings.describe().find((row) => row.ns === ns)?.value as {
+      searchProvider?: string
+    }
     if (current?.searchProvider !== searchProviderId) return false
-    await this.ctx.settings.mutate(ns, previous ? [{ op: 'set', path: ['searchProvider'], value: previous }]
-      : [{ op: 'unset', path: ['searchProvider'] }])
+    await this.ctx.settings.mutate(
+      ns,
+      previous
+        ? [{ op: 'set', path: ['searchProvider'], value: previous }]
+        : [{ op: 'unset', path: ['searchProvider'] }],
+    )
     return true
   }
+}
+
+type PreferenceChange =
+  | { key: 'sidebarAccount'; value: 'deepseek' | 'chatgpt' }
+  | { key: 'codexReview'; value: boolean }
+  | { key: 'searchMode'; value: SearchMode }
+
+function parsePreference(payload: unknown): PreferenceChange {
+  if (!payload || typeof payload !== 'object' || !('key' in payload) || !('value' in payload))
+    throw new Error('设置参数无效。')
+  const { key, value } = payload
+  switch (key) {
+    case 'sidebarAccount':
+      if (value === 'deepseek' || value === 'chatgpt') return { key, value }
+      break
+    case 'codexReview':
+      if (typeof value === 'boolean') return { key, value }
+      break
+    case 'searchMode':
+      if (value === 'off' || value === 'chatgpt' || value === 'all') return { key, value }
+      break
+  }
+  throw new Error('设置值无效。')
 }

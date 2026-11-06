@@ -1,5 +1,5 @@
-import native from '../index.cjs'
 import type { Cancellation } from '../index.cjs'
+import native from '../index.cjs'
 
 /** Own native operations for both caller cancellation and Cordis disposal. */
 export class Operations {

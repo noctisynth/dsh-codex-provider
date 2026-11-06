@@ -1,13 +1,13 @@
+mod auth;
 mod binding;
 mod error;
 mod models;
 mod responses;
 mod review;
-pub use review::parse_review_decision;
 mod transport;
 
 pub use binding::{
     AccountInfo, Cancellation, ChatGptClient, LoginAttempt, LoginResult, LogoutResult, Model,
     ModelReasoning, ModelReasoningEffort, create_host_id, describe_session,
 };
-mod auth;
+pub use review::parse_review_decision;

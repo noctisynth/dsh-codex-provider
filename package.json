@@ -16,8 +16,9 @@
     "index.cjs",
     "index.d.cts",
     "*.node",
-    "SHADCN-LICENSE.md",
-    "OPENAI-BRAND.md"
+    "client/ui/SHADCN-LICENSE.md",
+    "OPENAI-BRAND.md",
+    "client/ui/BASE-UI-LICENSE.md"
   ],
   "dsh": {
     "bundle": {
@@ -42,10 +43,13 @@
     "typecheck": "tsrs -p tsconfig.json --noEmit && tsrs -p tsconfig.client.json --noEmit",
     "build:debug": "napi build --platform --js index.cjs --dts index.d.cts",
     "test": "node --test test/*.test.mts",
-    "check": "cargo fmt --check && cargo clippy --all-targets -- -D warnings",
+    "check": "pnpm run check:rust && pnpm run typecheck && pnpm run lint",
     "artifacts": "napi artifacts",
     "create-npm-dirs": "napi create-npm-dirs",
-    "prepublishOnly": "napi prepublish -t npm --no-gh-release"
+    "prepublishOnly": "napi prepublish -t npm --no-gh-release",
+    "lint": "biome check . --error-on-warnings",
+    "format": "biome check --write .",
+    "check:rust": "cargo fmt --all --check && cargo clippy --all-targets --all-features -- -D warnings"
   },
   "napi": {
     "binaryName": "dsh-codex-provider",
@@ -74,6 +78,8 @@
     "open": "^10.2.0"
   },
   "devDependencies": {
+    "@base-ui/react": "^1.9.0",
+    "@biomejs/biome": "^2.6.5",
     "@deepseek-ai/cordis-plugin-loader": "~1.1.0",
     "@deepseek-ai/dsh-app-boot": "0.2.2-rc.1",
     "@deepseek-ai/dsh-attachment": "0.2.2-rc.1",
@@ -90,10 +96,6 @@
     "@deepseek-ai/dsh-web": "0.2.2-rc.1",
     "@deepseek-ai/dsh-working-directory": "0.2.2-rc.1",
     "@napi-rs/cli": "3.10.12",
-    "@radix-ui/react-dropdown-menu": "^2.2.1",
-    "@radix-ui/react-select": "^2.4.1",
-    "@radix-ui/react-slot": "^1.5.0",
-    "@radix-ui/react-switch": "^1.4.1",
     "@tailwindcss/cli": "^4.3.4",
     "@tsdown/css": "^0.23.5",
     "@types/node": "^22.20.5",

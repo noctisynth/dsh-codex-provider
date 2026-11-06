@@ -1,13 +1,16 @@
-import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { ChatGptClient, Cancellation, createHostId, describeSession } from '../index.cjs'
+import { test } from 'node:test'
+import { Cancellation, ChatGptClient, createHostId, describeSession } from '../index.cjs'
 import { sessionRecord } from './session-fixture.mts'
 
 test('aborted native sign-in rejects without opening a browser or making discovery requests', async () => {
   const client = new ChatGptClient({})
   const cancellation = new Cancellation()
   cancellation.cancel()
-  await assert.rejects(client.beginLogin(createHostId(), undefined, cancellation), /sign-in cancelled/)
+  await assert.rejects(
+    client.beginLogin(createHostId(), undefined, cancellation),
+    /sign-in cancelled/,
+  )
 })
 
 test('a fresh native session retains its record without a refresh request', async () => {
@@ -28,18 +31,28 @@ test('local logout clears tokens and retains registration when remote revocation
   const cleared = JSON.parse(result.record)
   assert.equal(cleared.client_id, JSON.parse(record).client_id)
   assert.equal(cleared.subject, JSON.parse(record).subject)
-  for (const field of ['access_token', 'refresh_token', 'id_token', 'nonce']) assert.equal(cleared[field], '')
+  for (const field of ['access_token', 'refresh_token', 'id_token', 'nonce'])
+    assert.equal(cleared[field], '')
   assert.equal(describeSession(result.record).hasCredentials, false)
 })
 
 test('invalid host identifiers fail at the native boundary', async () => {
-  await assert.rejects(new ChatGptClient({}).beginLogin('invalid-host', undefined, new Cancellation()), /host ID/)
+  await assert.rejects(
+    new ChatGptClient({}).beginLogin('invalid-host', undefined, new Cancellation()),
+    /host ID/,
+  )
 })
 
 test('account summaries expose optional profile data while older sessions remain readable', () => {
   const previous = sessionRecord()
   assert.equal(describeSession(previous).name == null, true)
-  const profile = describeSession(JSON.stringify({ ...JSON.parse(previous), name: 'Example User', picture: 'https://example.invalid/avatar.png' }))
+  const profile = describeSession(
+    JSON.stringify({
+      ...JSON.parse(previous),
+      name: 'Example User',
+      picture: 'https://example.invalid/avatar.png',
+    }),
+  )
   assert.equal(profile.name, 'Example User')
   assert.equal(profile.picture, 'https://example.invalid/avatar.png')
   assert.equal('id_token' in profile, false)

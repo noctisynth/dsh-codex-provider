@@ -1,0 +1,242 @@
+use serde_json::{Value, json};
+
+use super::host_request::REPLAY_FORMAT;
+use crate::error::Error;
+
+struct Block {
+    item_id: String,
+    part: u64,
+    kind: &'static str,
+    text: String,
+    call_id: String,
+    name: String,
+    ended: bool,
+}
+
+#[derive(Default)]
+pub(super) struct Mapper {
+    blocks: Vec<Block>,
+}
+
+fn required<'a>(value: &'a Value, key: &str) -> Result<&'a str, Error> {
+    value[key]
+        .as_str()
+        .ok_or(Error::Protocol("OpenAI event omitted a required string"))
+}
+
+impl Mapper {
+    fn block(
+        &mut self,
+        id: &str,
+        part: u64,
+        kind: &'static str,
+        item: &Value,
+        out: &mut Vec<Value>,
+    ) -> usize {
+        if let Some(index) = self
+            .blocks
+            .iter()
+            .position(|b| b.item_id == id && b.part == part && b.kind == kind)
+        {
+            return index;
+        }
+        let index = self.blocks.len();
+        self.blocks.push(Block {
+            item_id: id.into(),
+            part,
+            kind,
+            text: String::new(),
+            call_id: item["call_id"].as_str().unwrap_or_default().into(),
+            name: item["name"].as_str().unwrap_or_default().into(),
+            ended: false,
+        });
+        out.push(json!({"type":"block-start","index":index,"blockType":kind}));
+        if kind == "tool-call" {
+            let b = &self.blocks[index];
+            out.push(json!({"type":"tool-call-delta","index":index,"id":b.call_id,"name":b.name,"argumentsDelta":""}));
+        }
+        index
+    }
+
+    fn delta(&mut self, index: usize, delta: &str, out: &mut Vec<Value>) {
+        let block = &mut self.blocks[index];
+        block.text.push_str(delta);
+        out.push(match block.kind {
+            "tool-call" => json!({"type":"tool-call-delta","index":index,"id":block.call_id,"argumentsDelta":delta}),
+            "reasoning" => json!({"type":"reasoning-delta","index":index,"text":delta}),
+            _ => json!({"type":"text-delta","index":index,"text":delta}),
+        });
+    }
+
+    fn close(
+        &mut self,
+        index: usize,
+        value: Option<&str>,
+        out: &mut Vec<Value>,
+    ) -> Result<(), Error> {
+        let block = &self.blocks[index];
+        if block.ended {
+            return Ok(());
+        }
+        if let Some(value) = value {
+            let suffix = value.strip_prefix(&block.text).ok_or(Error::Protocol(
+                "OpenAI final content differs from its streamed prefix",
+            ))?;
+            if !suffix.is_empty() {
+                self.delta(index, suffix, out);
+            }
+        }
+        let block = &mut self.blocks[index];
+        block.ended = true;
+        let content = if block.kind == "tool-call" {
+            json!({"type":"tool-call","id":block.call_id,"name":block.name,"arguments":block.text})
+        } else {
+            json!({"type":block.kind,"text":block.text})
+        };
+        out.push(json!({"type":"block-end","index":index,"block":content}));
+        Ok(())
+    }
+
+    fn item_done(&mut self, item: &Value, out: &mut Vec<Value>) -> Result<(), Error> {
+        let id = required(item, "id")?;
+        match item["type"].as_str() {
+            Some("function_call") => {
+                let index = self.block(id, 0, "tool-call", item, out);
+                self.close(index, Some(required(item, "arguments")?), out)?;
+            }
+            Some("message") | Some("reasoning") => {
+                let reasoning = item["type"] == "reasoning";
+                let parts = if reasoning {
+                    &item["summary"]
+                } else {
+                    &item["content"]
+                };
+                if let Some(parts) = parts.as_array() {
+                    for (part, content) in parts.iter().enumerate() {
+                        let text = match content["type"].as_str() {
+                            Some("output_text") | Some("summary_text") => {
+                                required(content, "text")?
+                            }
+                            Some("refusal") => required(content, "refusal")?,
+                            _ => return Err(Error::Protocol("Unsupported OpenAI output content")),
+                        };
+                        let index = self.block(
+                            id,
+                            part as u64,
+                            if reasoning { "reasoning" } else { "text" },
+                            item,
+                            out,
+                        );
+                        self.close(index, Some(text), out)?;
+                    }
+                }
+            }
+            _ => return Err(Error::Protocol("Unsupported OpenAI output item")),
+        }
+        Ok(())
+    }
+
+    pub(super) fn accept(&mut self, event: Value) -> Result<Vec<Value>, Error> {
+        let mut out = Vec::new();
+        match required(&event, "type")? {
+            "response.output_item.added" if event["item"]["type"] == "function_call" => {
+                self.block(
+                    required(&event["item"], "id")?,
+                    0,
+                    "tool-call",
+                    &event["item"],
+                    &mut out,
+                );
+            }
+            "response.output_text.delta"
+            | "response.refusal.delta"
+            | "response.reasoning_summary_text.delta"
+            | "response.function_call_arguments.delta" => {
+                let kind = match event["type"].as_str() {
+                    Some("response.reasoning_summary_text.delta") => "reasoning",
+                    Some("response.function_call_arguments.delta") => "tool-call",
+                    _ => "text",
+                };
+                let part = event[if kind == "reasoning" {
+                    "summary_index"
+                } else {
+                    "content_index"
+                }]
+                .as_u64()
+                .unwrap_or(0);
+                let id = required(&event, "item_id")?;
+                if kind == "tool-call" && !self.blocks.iter().any(|b| b.item_id == id) {
+                    return Err(Error::Protocol("OpenAI tool delta arrived before its item"));
+                }
+                let index = self.block(id, part, kind, &Value::Null, &mut out);
+                self.delta(index, required(&event, "delta")?, &mut out);
+            }
+            "response.output_item.done" => self.item_done(&event["item"], &mut out)?,
+            "response.completed" => {
+                let output = event["response"]["output"]
+                    .as_array()
+                    .ok_or(Error::Protocol("OpenAI completed response omitted output"))?;
+                for item in output {
+                    self.item_done(item, &mut out)?;
+                }
+                let mut replay_blocks = vec![json!({"items":[]}); self.blocks.len()];
+                let mut pending = Vec::new();
+                for item in output {
+                    pending.push(item.clone());
+                    if let Some(index) = self.blocks.iter().position(|b| item["id"] == b.item_id) {
+                        replay_blocks[index] = json!({"items":std::mem::take(&mut pending)});
+                    }
+                }
+                let usage = &event["response"]["usage"];
+                if let (Some(input), Some(output)) = (
+                    usage["input_tokens"].as_u64(),
+                    usage["output_tokens"].as_u64(),
+                ) {
+                    let cached = usage["input_tokens_details"]["cached_tokens"]
+                        .as_u64()
+                        .unwrap_or(0);
+                    out.push(json!({"type":"usage","usage":{
+                        "inputTokens":input.saturating_sub(cached),"cacheReadTokens":cached,"outputTokens":output,
+                        "totalTokens":input+output,"reasoningTokens":usage["output_tokens_details"]["reasoning_tokens"].as_u64().unwrap_or(0)
+                    }}));
+                }
+                let reason = if self.blocks.iter().any(|b| b.kind == "tool-call") {
+                    "tool-calls"
+                } else {
+                    "stop"
+                };
+                out.push(json!({"type":"finish","reason":{"kind":reason},"replayState":{
+                    "response":{"format":REPLAY_FORMAT,"trailing":pending},"blocks":replay_blocks
+                }}));
+            }
+            _ => {}
+        }
+        Ok(out)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tool_stream_finishes_with_disjoint_usage_and_lossless_replay() -> Result<(), Error> {
+        let mut mapper = Mapper::default();
+        let item = json!({"type":"function_call","id":"fc_test","call_id":"call_test","name":"lookup","arguments":""});
+        let start = mapper.accept(json!({"type":"response.output_item.added","item":item}))?;
+        assert_eq!(start[1]["id"], "call_test");
+        mapper.accept(json!({"type":"response.function_call_arguments.delta","item_id":"fc_test","delta":"{}"}))?;
+        let mut final_item = item;
+        final_item["arguments"] = json!("{}");
+        let reasoning =
+            json!({"type":"reasoning","id":"rs_test","summary":[],"encrypted_content":"opaque"});
+        let chunks = mapper.accept(json!({"type":"response.completed","response":{
+            "output":[reasoning,final_item],"usage":{"input_tokens":10,"input_tokens_details":{"cached_tokens":4},"output_tokens":3}
+        }}))?;
+        assert_eq!(chunks[0]["block"]["arguments"], "{}");
+        assert_eq!(chunks[1]["usage"]["inputTokens"], 6);
+        assert_eq!(chunks[2]["reason"]["kind"], "tool-calls");
+        assert_eq!(chunks[2]["replayState"]["blocks"][0]["items"][0], reasoning);
+        Ok(())
+    }
+}

@@ -3,14 +3,14 @@
   "version": "0.0.0",
   "description": "DSH provider for the official ChatGPT open-source app protocol",
   "license": "UNLICENSED",
-  "main": "index.js",
-  "types": "index.d.ts",
-  "files": ["index.js", "index.d.ts", "*.node"],
+  "main": "plugin/index.mjs",
+  "files": ["plugin", "cordis.patch.yml", "index.js", "index.d.ts", "*.node"],
+  "dsh": { "bundle": { "patch": "./cordis.patch.yml" } },
   "engines": { "node": ">=22.14.0" },
   "packageManager": "pnpm@11.28.5",
   "scripts": {
-    "build": "napi build --platform --release",
-    "build:debug": "napi build --platform",
+    "build": "napi build --platform --js index.js --dts index.d.ts --release",
+    "build:debug": "napi build --platform --js index.js --dts index.d.ts",
     "test": "node --test test/*.test.cjs",
     "check": "cargo fmt --check && cargo clippy --all-targets -- -D warnings",
     "artifacts": "napi artifacts",
@@ -21,5 +21,12 @@
     "binaryName": "dsh-codex-provider",
     "targets": ["x86_64-pc-windows-msvc"]
   },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "~4.0.5",
+    "@deepseek-ai/dsh-authorization": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-credentials": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-llm": "0.2.1-rc.2"
+  },
+  "dependencies": { "open": "^10.2.0" },
   "devDependencies": { "@napi-rs/cli": "3.10.12" }
 }

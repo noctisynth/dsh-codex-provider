@@ -212,7 +212,7 @@ impl ChatGptClient {
         {
             return Err(Error::Auth("ChatGPT plan usage was not authorized").into());
         }
-        let request = responses::Request::decode(&request_json)?;
+        let request = responses::from_host(&request_json)?;
         let events = responses::stream(
             self.transport.clone(),
             session,
@@ -224,9 +224,9 @@ impl ChatGptClient {
     }
 
     #[napi(constructor)]
-    pub fn new() -> napi::Result<Self> {
+    pub fn new(headers: std::collections::HashMap<String, String>) -> napi::Result<Self> {
         Ok(Self {
-            transport: Transport::new()?,
+            transport: Transport::new(headers)?,
         })
     }
 
@@ -301,13 +301,19 @@ impl ChatGptClient {
 
     /// Backend-only interface. Tokens must never be forwarded to browser UI.
     #[napi]
-    pub async fn list_models(&self, access_token: String) -> napi::Result<Vec<Model>> {
-        Ok(self
-            .transport
-            .models(&access_token)
-            .await?
-            .into_iter()
-            .map(Model::from)
-            .collect())
+    pub async fn list_models(
+        &self,
+        record: String,
+        cancellation: &Cancellation,
+    ) -> napi::Result<Vec<Model>> {
+        let session = auth::Session::decode(&record)?;
+        if !AccountInfo::from(&session).plan_usage_authorized {
+            return Err(Error::Auth("ChatGPT plan usage was not authorized").into());
+        }
+        let models = tokio::select! {
+            _ = cancellation.token.cancelled() => return Err(Error::Cancelled.into()),
+            result = self.transport.models(&session.access_token) => result?,
+        };
+        Ok(models.into_iter().map(Model::from).collect())
     }
 }

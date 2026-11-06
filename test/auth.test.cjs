@@ -4,7 +4,7 @@ const { ChatGptClient, Cancellation, createHostId, describeSession } = require('
 const { sessionRecord } = require('./session-fixture.cjs')
 
 test('aborted native sign-in rejects without opening a browser or making discovery requests', async () => {
-  const client = new ChatGptClient()
+  const client = new ChatGptClient({})
   const cancellation = new Cancellation()
   cancellation.cancel()
   await assert.rejects(client.beginLogin(createHostId(), undefined, cancellation), /sign-in cancelled/)
@@ -12,7 +12,7 @@ test('aborted native sign-in rejects without opening a browser or making discove
 
 test('a fresh native session retains its record without a refresh request', async () => {
   const record = sessionRecord()
-  const result = await new ChatGptClient().renewSession(record, new Cancellation())
+  const result = await new ChatGptClient({}).renewSession(record, new Cancellation())
   assert.deepEqual(JSON.parse(result.record), JSON.parse(record))
   assert.equal(result.account.hasCredentials, true)
   assert.equal(result.account.planUsageAuthorized, true)
@@ -23,7 +23,7 @@ test('local logout clears tokens and retains registration when remote revocation
   const record = sessionRecord()
   const cancellation = new Cancellation()
   cancellation.cancel()
-  const result = await new ChatGptClient().logoutSession(record, cancellation)
+  const result = await new ChatGptClient({}).logoutSession(record, cancellation)
   assert.equal(result.revocationConfirmed, false)
   const cleared = JSON.parse(result.record)
   assert.equal(cleared.client_id, JSON.parse(record).client_id)
@@ -33,5 +33,5 @@ test('local logout clears tokens and retains registration when remote revocation
 })
 
 test('invalid host identifiers fail at the native boundary', async () => {
-  await assert.rejects(new ChatGptClient().beginLogin('invalid-host', undefined, new Cancellation()), /host ID/)
+  await assert.rejects(new ChatGptClient({}).beginLogin('invalid-host', undefined, new Cancellation()), /host ID/)
 })

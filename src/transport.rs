@@ -36,8 +36,18 @@ impl Transport {
         Ok(response)
     }
 
-    pub fn new() -> Result<Self, Error> {
+    pub fn new(headers: std::collections::HashMap<String, String>) -> Result<Self, Error> {
+        let mut default_headers = reqwest::header::HeaderMap::new();
+        for (name, value) in headers {
+            default_headers.insert(
+                reqwest::header::HeaderName::from_bytes(name.as_bytes())
+                    .map_err(|_| Error::Protocol("Invalid DSH attribution header name"))?,
+                reqwest::header::HeaderValue::from_str(&value)
+                    .map_err(|_| Error::Protocol("Invalid DSH attribution header value"))?,
+            );
+        }
         let client = reqwest::Client::builder()
+            .default_headers(default_headers)
             .redirect(reqwest::redirect::Policy::none())
             .build()
             .map_err(Error::Network)?;

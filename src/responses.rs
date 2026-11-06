@@ -6,6 +6,10 @@ use tokio_util::sync::CancellationToken;
 
 use crate::{auth::Session, error::Error, transport::Transport};
 
+mod host_events;
+mod host_request;
+pub(crate) use host_request::from_host;
+
 #[derive(Deserialize, Serialize)]
 pub(crate) struct Request {
     model: String,
@@ -22,12 +26,6 @@ pub(crate) struct Request {
     temperature: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     include: Option<Vec<String>>,
-}
-
-impl Request {
-    pub fn decode(json: &str) -> Result<Self, Error> {
-        serde_json::from_str(json).map_err(|_| Error::Protocol("Invalid Responses request"))
-    }
 }
 
 #[derive(Serialize)]
@@ -53,7 +51,10 @@ pub(crate) fn stream(
         let source = response.bytes_stream().eventsource()
             .map_err(|_| Error::Protocol("Invalid or interrupted OpenAI event stream")).boxed();
         let mut events = decode(source, cancel);
-        while let Some(event) = events.next().await { yield event?; }
+        let mut mapper = host_events::Mapper::default();
+        while let Some(event) = events.next().await {
+            for chunk in mapper.accept(event?)? { yield chunk; }
+        }
     })
 }
 
@@ -104,8 +105,9 @@ mod tests {
     #[test]
     fn wire_request_always_disables_storage_and_enables_streaming()
     -> Result<(), Box<dyn std::error::Error>> {
-        let request =
-            Request::decode(r#"{"model":"test-model","input":[],"store":true,"stream":false}"#)?;
+        let request: Request = serde_json::from_str(
+            r#"{"model":"test-model","input":[],"store":true,"stream":false}"#,
+        )?;
         let wire = serde_json::to_value(StreamingRequest {
             request: &request,
             store: false,

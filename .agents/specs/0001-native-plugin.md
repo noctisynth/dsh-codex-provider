@@ -98,6 +98,8 @@ Semifold 管理 changeset、根 npm 版本、release PR 和发布编排。一个
 
 登录选择按 option ID 关联账号摘要，显示“重新登录”加姓名或邮箱；添加选项显示“添加新账号”。保留其他授权提示的原始含义。登录操作区使用单层圆角细边框、弱主题背景及内边距，与已有账号和容器外的模型说明区分；内部选项继续使用 ghost Button。箭头动画仅使用 Tailwind group-hover、transition-transform 和 motion-reduce utilities；加载指示仅用于没有待选项的授权等待。
 
+取消登录复用小尺寸 outline Button，置于登录区域底部的独立操作行，靠右排列并以细分隔线和留白与选项区分。两种授权状态共用该操作行，继续调用既有取消逻辑。
+
 从经过现有 OIDC 验证的 ID token 读取可选 name、picture，与 email 一起保存并投影为账号摘要。刷新返回这些字段时更新，未返回则保留已有资料；旧会话缺字段可正常读取，通过后续登录或携带 ID token 的刷新补齐。头像仅使用 HTTPS URL，加载失败显示姓名首字或通用用户图标。前端不解析令牌，套餐位置使用邮箱。
 
 标题与设置导航复用一个 OpenAI 标志组件，保留官方 SVG 形状和比例；以当前文字颜色适配宿主深浅主题。导航通过 settings.section.icon 插槽按同一分区 ID 注册，并采用宿主传入的 size。SVG 随浏览器产物内联，不增加运行时远程图片请求。

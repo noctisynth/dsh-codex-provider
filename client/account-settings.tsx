@@ -240,15 +240,16 @@ export function AccountSettings({
               })}
             </div>
           )}
-          <Button
-            size="xs"
-            variant="ghost"
-            className="cp:mt-3"
-            disabled={busy}
-            onClick={() => act("cancel")}
-          >
-            取消登录
-          </Button>
+          <div className="cp:mt-3 cp:flex cp:justify-end cp:border-0 cp:border-t cp:border-solid cp:border-border cp:pt-3">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={busy}
+              onClick={() => act("cancel")}
+            >
+              取消登录
+            </Button>
+          </div>
         </div>
       )}
       {notice && (

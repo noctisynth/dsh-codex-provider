@@ -18,7 +18,7 @@ Rust 保留目录中的 supported_reasoning_levels 和 default_reasoning_level�
 
 界面重设计采用 React 与 TypeScript，保持宿主 React 运行时共享。按实际使用引入 shadcn/ui 组件，采用 Tailwind utilities；关闭插件侧 Preflight，避免重置宿主元素，使用插件专属前缀隔离工具类。颜色和字体优先映射 DSH 主题，不引入独立主题开关。仅保留 Tailwind 构建指令、必要主题映射及宿主样式装载所需的最小 CSS。组件版本与 React 18 的兼容性、Tailwind 产物的加载和样式边界须在实现时验证。
 
-账号交互状态由独立 React hook 维护，视图复用 Button、Badge、Card、Alert、Skeleton。Tailwind 4 官方 CLI 生成带 cp 前缀的样式，tsdown 官方 CSS inline 导入将其收进浏览器工厂；Cordis effect 装载样式并在卸载时移除。UI 依赖只参与构建并内联，React 与 JSX runtime 由宿主提供。主题颜色直接引用 DSH 变量，保留 Tailwind 自动生成的命名空间主题变量与运行时属性声明，不引入手写全局重置。依据及验证边界见 EVIDENCE-011。
+账号交互状态由独立 React hook 维护，视图复用 Button、Skeleton，以分隔线账号列表组织内容。Tailwind 4 官方 CLI 生成带 cp 前缀的样式，tsdown 官方 CSS inline 导入将其收进浏览器工厂；Cordis effect 装载样式并在卸载时移除。UI 依赖只参与构建并内联，React 与 JSX runtime 由宿主提供。主题颜色直接引用 DSH 变量，保留 Tailwind 自动生成的命名空间主题变量与运行时属性声明，不引入手写全局重置。依据及验证边界见 EVIDENCE-011、EVIDENCE-012。
 
 拟采用紧凑的连接状态、账号行和主操作层级，替换目前的原生按钮和内联样式；主设置页与插件配置面共用组件。加载、浏览器授权等待、账号选择和错误状态沿用现有后端契约。
 
@@ -95,6 +95,8 @@ Semifold 管理 changeset、根 npm 版本、release PR 和发布编排。一个
 纯 Agent 上下文修改不创建 changeset。产品成果附 changeset 和本地提交；开发期间不执行公开发布。配置实施及实际发布验证由 TODO-001 跟踪。
 
 ## 验证尺度
+
+账号设置在挂载、窗口重新获得焦点及页面恢复可见时重新读取状态，登录期间保持短轮询，操作完成后显式刷新。普通成功反馈短暂显示后清除，授权进度仅在登录进行时展示。账号行不展示注册 ID；当前账号标记以凭据存在为前提。退出确认使用浏览器原生模态 dialog 的焦点管理与 Escape 行为，内部操作采用 shadcn Button 和 Tailwind；避免为单个弹窗引入第二个 React DOM 运行时。
 
 围绕已实现行为选择必要检查：授权与身份校验、刷新一致性、流式事件、工具调用、取消、宿主加载和发布产物安装。优先关键行为和集成证据，不为实现细节镜像编写测试，不额外构建审查体系。
 

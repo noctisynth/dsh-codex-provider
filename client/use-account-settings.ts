@@ -7,8 +7,8 @@ export function useAccountSettings(rpc: ClientConnectionRpc) {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [revision, refresh] = useState(0);
   const ownedLogin = useRef(false);
-
   const call = async <A extends keyof AccountActions>(
     action: A,
     payload: { id: string } | null = null,
@@ -18,7 +18,6 @@ export function useAccountSettings(rpc: ClientConnectionRpc) {
     if (!result.ok) throw new Error(result.error.message);
     return result.value as AccountActions[A];
   };
-
   useEffect(() => {
     const lifetime = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -31,7 +30,7 @@ export function useAccountSettings(rpc: ClientConnectionRpc) {
         if (value.login.running) timer = setTimeout(load, 700);
       } catch (error) {
         if (!lifetime.signal.aborted)
-          setError(error instanceof Error ? error.message : "无法读取 ChatGPT 状态。");
+          setError(error instanceof Error ? error.message : "无法读取账号状态。");
       }
     };
     void load();
@@ -39,15 +38,34 @@ export function useAccountSettings(rpc: ClientConnectionRpc) {
       lifetime.abort();
       clearTimeout(timer);
     };
-  }, [rpc, busy]);
-
+  }, [rpc, revision]);
+  useEffect(() => {
+    const resume = () => {
+      setNotice("");
+      setError("");
+      refresh((value) => value + 1);
+    };
+    const visible = () => {
+      if (document.visibilityState === "visible") resume();
+    };
+    window.addEventListener("focus", resume);
+    document.addEventListener("visibilitychange", visible);
+    return () => {
+      window.removeEventListener("focus", resume);
+      document.removeEventListener("visibilitychange", visible);
+    };
+  }, []);
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(""), 5000);
+    return () => clearTimeout(timer);
+  }, [notice]);
   useEffect(
     () => () => {
       if (ownedLogin.current) void call("cancel").catch(() => {});
     },
     [rpc],
   );
-
   async function act(
     action: Exclude<keyof AccountActions, "status">,
     payload?: { id: string },
@@ -58,18 +76,16 @@ export function useAccountSettings(rpc: ClientConnectionRpc) {
     try {
       const value = await call(action, payload);
       if (action === "login") ownedLogin.current = true;
-      if (action === "logout")
-        setNotice(
-          (value as AccountActions["logout"]).revocationConfirmed
-            ? "已退出 ChatGPT。"
-            : "本地凭据已清除，未能确认远端授权撤销。",
-        );
+      if (action === "logout") {
+        if ((value as AccountActions["logout"]).revocationConfirmed) setNotice("已退出登录");
+        else setError("本地凭据已清除，未能确认远端授权撤销。");
+      }
     } catch (error) {
-      setError(error instanceof Error ? error.message : "ChatGPT 操作失败。");
+      setError(error instanceof Error ? error.message : "操作失败，请重试。");
     } finally {
       setBusy(false);
+      refresh((value) => value + 1);
     }
   }
-
   return { status, busy, notice, error, act };
 }

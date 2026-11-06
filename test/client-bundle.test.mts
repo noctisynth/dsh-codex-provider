@@ -14,10 +14,12 @@ test('the shipped settings preserve account actions, host React sharing and styl
   const style = { dataset: {}, textContent: '', remove() { removed = true } }
   let removed = false
   let dispose: (() => void) | undefined
+  const windowEvents = new EventTarget()
+  const documentEvents = new EventTarget()
   runInNewContext(await readFile(new URL('../lib/client.js', import.meta.url), 'utf8'), {
     AbortController, setTimeout, clearTimeout,
-    document: { createElement: () => style, head: { append(value: unknown) { assert.equal(value, style) } } },
-    window: { __ModuleLoader__: { load(value: typeof loaded) { loaded = value } } },
+    document: { visibilityState: 'visible', addEventListener: documentEvents.addEventListener.bind(documentEvents), removeEventListener: documentEvents.removeEventListener.bind(documentEvents), createElement: () => style, head: { append(value: unknown) { assert.equal(value, style) } } },
+    window: { addEventListener: windowEvents.addEventListener.bind(windowEvents), removeEventListener: windowEvents.removeEventListener.bind(windowEvents), __ModuleLoader__: { load(value: typeof loaded) { loaded = value } } },
   })
   assert.ok(loaded)
   assert.equal(loaded.id, 'dsh-codex-provider')
@@ -60,17 +62,30 @@ test('the shipped settings preserve account actions, host React sharing and styl
   running = false
   accounts = [{ clientId: 'synthetic-account', email: 'demo@example.com', hasCredentials: true, planUsageAuthorized: true }]
   try {
-    await act(async () => { view = create(createElement(Settings, { rpc, embedded: true })) })
+    await act(async () => { view = create(createElement(Settings, { rpc, embedded: true }), { createNodeMock: element => element.type === 'dialog' ? { showModal() {} } : null }) })
     assert.ok(view)
     const select = view.root.findAllByType('button').find(button => button.props.children === '切换账号')
     assert.ok(select)
     await act(async () => { await select.props.onClick() })
     assert.equal(JSON.stringify(requests.find(request => request.method.endsWith('/select'))?.payload), JSON.stringify({ id: 'synthetic-account' }))
-    const logout = view.root.findAllByType('button').find(button => Array.isArray(button.props.children) && button.props.children.includes('退出登录'))
+    const logout = view.root.findAllByType('button').find(button => button.props.children === '退出登录')
     assert.ok(logout)
     await act(async () => { await logout.props.onClick() })
+    assert.equal(requests.filter(request => request.method.endsWith('/logout')).length, 0)
+    const cancel = view.root.findAllByType('button').find(button => button.props.children === '取消')
+    assert.ok(cancel)
+    await act(async () => { cancel.props.onClick() })
+    assert.equal(view.root.findAllByType('dialog').length, 0)
+    await act(async () => { logout.props.onClick() })
+    const confirm = view.root.findAllByType('button').find(button => button.props.children === '确认退出')
+    assert.ok(confirm)
+    await act(async () => { confirm.props.onClick() })
     assert.equal(JSON.stringify(requests.find(request => request.method.endsWith('/logout'))?.payload), JSON.stringify({ id: 'synthetic-account' }))
     assert.match(JSON.stringify(view.toJSON()), /本地凭据已清除，未能确认远端授权撤销/)
+    accounts = accounts.map(account => ({ ...account, hasCredentials: false }))
+    await act(async () => { windowEvents.dispatchEvent(new Event('focus')) })
+    assert.match(JSON.stringify(view.toJSON()), /重新登录后可用/)
+    assert.doesNotMatch(JSON.stringify(view.toJSON()), /当前使用|synthetic-account|注册信息/)
   } finally { await act(async () => { view?.unmount() }) }
   assert.match(style.textContent, /--cp-spacing/)
   dispose?.()

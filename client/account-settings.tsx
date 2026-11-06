@@ -9,7 +9,6 @@ import { Button } from "./ui/button.tsx";
 import { Skeleton } from "./ui/skeleton.tsx";
 import { OpenAiLogo } from "./openai-logo.tsx";
 import { AccountAvatar } from "./account-avatar.tsx";
-import { SidebarAccountPreference } from "./sidebar-account.tsx";
 import { LogoutConfirmation } from "./logout-confirmation.tsx";
 import { FeatureSettings } from "./feature-settings.tsx";
 
@@ -233,7 +232,6 @@ export function AccountSettings({
       <p className="cp:mt-5 cp:mb-0 cp:text-xs cp:text-muted-foreground">
         模型与推理强度在对话的模型菜单中切换。
       </p>
-      <SidebarAccountPreference form={preference} rpc={rpc} />
       <FeatureSettings form={preference} rpc={rpc} />
       {logout && (
         <LogoutConfirmation

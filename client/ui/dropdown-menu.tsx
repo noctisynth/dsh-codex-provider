@@ -1,9 +1,18 @@
 import type { ComponentProps } from "react";
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
 import { cn } from "../lib/utils.ts";
+import { Check } from 'lucide-react';
 
 export const DropdownMenu = DropdownMenuPrimitive.Root;
 export const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
+export const DropdownMenuRadioGroup = DropdownMenuPrimitive.RadioGroup;
+
+export function DropdownMenuRadioItem({ className, children, ...props }: ComponentProps<typeof DropdownMenuPrimitive.RadioItem>) {
+  return <DropdownMenuPrimitive.RadioItem {...props} className={cn('cp:relative cp:flex cp:cursor-default cp:select-none cp:items-center cp:gap-2 cp:rounded-lg cp:py-2 cp:pr-8 cp:pl-2.5 cp:outline-none cp:data-[highlighted]:bg-accent cp:data-[disabled]:pointer-events-none cp:data-[disabled]:opacity-50', className)}>
+    {children}
+    <DropdownMenuPrimitive.ItemIndicator className="cp:absolute cp:right-2.5 cp:flex cp:items-center"><Check className="cp:size-3.5" /></DropdownMenuPrimitive.ItemIndicator>
+  </DropdownMenuPrimitive.RadioItem>
+}
 
 export function DropdownMenuContent({
   className,

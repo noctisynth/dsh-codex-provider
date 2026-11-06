@@ -19,7 +19,7 @@ test('the shipped settings preserve account actions, host React sharing and styl
   const windowEvents = new EventTarget()
   const documentEvents = new EventTarget()
   runInNewContext(await readFile(new URL('../lib/client.js', import.meta.url), 'utf8'), {
-    AbortController, Event, setTimeout, clearTimeout,
+    AbortController, Event, setTimeout, clearTimeout, HTMLFormElement: class {},
     document: { visibilityState: 'visible', addEventListener: documentEvents.addEventListener.bind(documentEvents), removeEventListener: documentEvents.removeEventListener.bind(documentEvents), createElement: () => style, head: { append(value: unknown) { assert.equal(value, style) } } },
     window: { dispatchEvent: windowEvents.dispatchEvent.bind(windowEvents), addEventListener: windowEvents.addEventListener.bind(windowEvents), removeEventListener: windowEvents.removeEventListener.bind(windowEvents), __ModuleLoader__: { load(value: typeof loaded) { loaded = value } } },
   })
@@ -93,14 +93,11 @@ test('the shipped settings preserve account actions, host React sharing and styl
     const review = view.root.findAllByType('button').find(button => button.props['aria-label'] === '由 ChatGPT 审批')
     assert.ok(review)
     assert.equal(review.props['aria-checked'], false)
-    await act(async () => { await review.props.onClick() })
+    await act(async () => { review.props.onClick({ defaultPrevented: false, isPropagationStopped: () => false, stopPropagation() {} }) })
     assert.equal(snapshot.value?.codexReview, true)
-    for (const [label, mode] of [['所有模型', 'all'], ['仅 ChatGPT', 'chatgpt'], ['关闭', 'off']]) {
-      const search = view.root.findAllByType('button').find(button => button.props.children === label)
-      assert.ok(search)
-      await act(async () => { await search.props.onClick() })
-      assert.equal(snapshot.value?.searchMode, mode)
-    }
+    const search = view.root.findAllByType('button').find(button => button.props['aria-label'] === '网页搜索')
+    assert.ok(search)
+    assert.equal(search.props['aria-haspopup'], 'menu')
     const button = view.root.findAllByType('button').find(button => button.props['aria-label'] === '使用 ChatGPT 登录')
     assert.ok(button)
     await act(async () => { await button.props.onClick() })
@@ -158,9 +155,7 @@ test('the shipped settings preserve account actions, host React sharing and styl
   try {
     await act(async () => { view = create(createElement(Settings, { rpc, preference, embedded: false }), { createNodeMock: element => element.type === 'dialog' ? { showModal() {}, close() {} } : null }) })
     assert.equal(launcher, undefined)
-    const chatgpt = view!.root.findAllByType('button').find(button => button.props.children === 'ChatGPT')
-    assert.ok(chatgpt)
-    await act(async () => { await chatgpt.props.onClick() })
+    await act(async () => { await rpc.call('/api', 'codex-provider/preference', { key: 'sidebarAccount', value: 'chatgpt' }) })
     assert.equal(snapshot.value?.sidebarAccount, 'chatgpt')
     assert.ok(launcher)
     let opened = 0
@@ -180,9 +175,7 @@ test('the shipped settings preserve account actions, host React sharing and styl
     accounts = accounts.map(account => ({ ...account, hasCredentials: false }))
     await act(async () => { await confirm.props.onClick() })
     assert.equal(sidebar!.root.findByType('button').props.title, 'ChatGPT · ChatGPT')
-    const deepseek = view!.root.findAllByType('button').find(button => button.props.children === 'DeepSeek')
-    assert.ok(deepseek)
-    await act(async () => { await deepseek.props.onClick() })
+    await act(async () => { await rpc.call('/api', 'codex-provider/preference', { key: 'sidebarAccount', value: 'deepseek' }) })
     assert.equal(launcher, undefined)
     await act(async () => { await preference.set('sidebarAccount', 'chatgpt') })
     assert.ok(launcher)

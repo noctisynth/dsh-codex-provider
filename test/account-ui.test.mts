@@ -48,10 +48,11 @@ test('the host UI derives optional avatar fallbacks, keeps credentials private a
     },
   })
   const operations = new Operations()
+  let preferenceFailure: Error | undefined
   const mounted = ctx.plugin({
     inject: ['credentials', 'authorization', 'connection'],
     apply(child: Context) {
-      mountAccountUi(child, new Accounts(child.credentials, new ChatGptClient({}), operations), operations)
+      mountAccountUi(child, new Accounts(child.credentials, new ChatGptClient({}), operations), operations, async () => { if (preferenceFailure) throw preferenceFailure })
     },
   })
   await mounted.await()
@@ -64,6 +65,13 @@ test('the host UI derives optional avatar fallbacks, keeps credentials private a
     }))
     return serverResponseSchema.parse(await response.json()).result
   }
+  preferenceFailure = Object.assign(new Error('synthetic-private-config-path'), { code: 'EPERM', syscall: 'rename' })
+  const blocked = await rpc('preference', { key: 'codexReview', value: true })
+  assert.ok(!blocked.ok)
+  assert.equal(blocked.error.code, 'settings-file-unavailable')
+  assert.match(blocked.error.message, /编辑器/)
+  assert.doesNotMatch(JSON.stringify(blocked), /synthetic-private-config-path/)
+  preferenceFailure = undefined
   try {
     const result = await rpc('status')
     assert.ok(result.ok)

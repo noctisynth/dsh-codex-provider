@@ -109,8 +109,12 @@ export function mountAccountUi(ctx: Context, accounts: Accounts, operations: Ope
         try {
           request.signal.throwIfAborted()
           result = { ok: true, value: await dispatch(action, parsed.data.payload, request.signal) }
-        } catch {
-          result = { ok: false, error: { code: 'chatgpt-operation-failed', message: action === 'preference' ? '设置保存失败，请稍后重试。' : 'ChatGPT 操作失败，请检查登录状态后重试。', details: {} } }
+        } catch (cause) {
+          const fileError = action === 'preference' && cause && typeof cause === 'object' && 'syscall' in cause && cause.syscall === 'rename'
+            && 'code' in cause && ['EACCES', 'EBUSY', 'EPERM'].includes(String(cause.code))
+          result = { ok: false, error: { code: fileError ? 'settings-file-unavailable' : 'chatgpt-operation-failed',
+            message: fileError ? '无法保存配置文件：请关闭编辑器中打开的 DSH 配置文件后重试；若仍失败，请检查写入权限。'
+              : action === 'preference' ? '设置保存失败，请稍后重试。' : 'ChatGPT 操作失败，请检查登录状态后重试。', details: {} } }
         }
         return Response.json({ type: 'server-response', rpcId: parsed.data.rpcId, result })
       },

@@ -1,4 +1,4 @@
-import { useRef, useState, useSyncExternalStore } from "react";
+import { useRef, useState } from "react";
 import { ArrowLeftRight, LogOut, Settings } from "lucide-react";
 import type { Context } from "@deepseek-ai/cordis";
 import type { ClientConnectionRpc } from "@deepseek-ai/dsh-client-connection/client";
@@ -13,48 +13,6 @@ import { cn } from "./lib/utils.ts";
 import { LogoutConfirmation } from "./logout-confirmation.tsx";
 import { useAccountSettings } from "./use-account-settings.ts";
 import { setPreference } from "./preferences.ts";
-
-export function SidebarAccountPreference({ form, rpc }: { form: ConfigForm<SidebarPreference>; rpc: ClientConnectionRpc }) {
-  const snapshot = useSyncExternalStore(listener => form.subscribe(listener), () => form.getSnapshot());
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  async function select(value: SidebarPreference["sidebarAccount"]) {
-    setSaving(true);
-    setError("");
-    try {
-      await setPreference(rpc, "sidebarAccount", value);
-    } catch {
-      setError("未能保存侧边栏显示设置，请重试。");
-    } finally {
-      setSaving(false);
-    }
-  }
-  return (
-    <div className="cp:mt-5 cp:border-0 cp:border-t cp:border-solid cp:border-border cp:pt-4">
-      <div className="cp:flex cp:flex-wrap cp:items-center cp:justify-between cp:gap-3">
-        <div className="cp:font-medium">侧边栏账号</div>
-        <div role="group" aria-label="侧边栏账号" className="cp:flex cp:gap-1">
-          {([['deepseek', 'DeepSeek'], ['chatgpt', 'ChatGPT']] as const).map(([value, label]) => (
-            <Button
-              key={value}
-              size="xs"
-              variant={snapshot.value?.sidebarAccount === value ? "outline" : "ghost"}
-              aria-pressed={snapshot.value?.sidebarAccount === value}
-              disabled={saving || snapshot.status !== "ready" || !snapshot.writable}
-              onClick={() => select(value)}
-            >
-              {label}
-            </Button>
-          ))}
-        </div>
-      </div>
-      <p className="cp:mt-2 cp:mb-0 cp:text-xs cp:text-muted-foreground">
-        ChatGPT 模式下隐藏 DeepSeek 账号菜单及提醒，可随时切回。
-      </p>
-      {error && <p role="alert" className="cp:mt-2 cp:mb-0 cp:text-xs cp:text-destructive">{error}</p>}
-    </div>
-  );
-}
 
 export function ChatGptLauncher({ rpc, form, wide, openSettings, settingsShortcut }: SettingsLauncherOwnerProps & { rpc: ClientConnectionRpc; form: ConfigForm<SidebarPreference> }) {
   const { status, busy, error, act } = useAccountSettings(rpc);
@@ -72,8 +30,8 @@ export function ChatGptLauncher({ rpc, form, wide, openSettings, settingsShortcu
     setPreferenceError("");
     try {
       await setPreference(rpc, "sidebarAccount", "deepseek");
-    } catch {
-      setPreferenceError("未能保存侧边栏显示设置，请重试。");
+    } catch (cause) {
+      setPreferenceError(cause instanceof Error ? cause.message : "未能保存侧边栏显示设置，请重试。");
     } finally {
       setSaving(false);
     }

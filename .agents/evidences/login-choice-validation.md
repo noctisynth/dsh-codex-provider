@@ -12,6 +12,8 @@
 
 来源：https://auth.openai.com/.well-known/openid-configuration ，https://developers.openai.com/siwc/quickstart 。本次未增加无收益的 UserInfo 网络请求到产品，也未引入私有资料接口。
 
+用户提供社区报告后，核对 apache/maka PR 1950 的完整 diff：subscription-auth 测试确有从 ID token 补取 picture/email 的用例，但 makeJwt 人工生成 payload，测试标头使用 alg none、签名为固定占位。因此它是解析行为证据，不能证明真实授权必返头像。项目已经请求 profile，并从经过验证的 ID token 读取 picture，不存在该报告假定的只检查 access token 的问题。官方网站登录文档将 profile 描述为返回 available claims，示例亦使用可空 picture。来源：https://github.com/apache/maka/pull/1950/files 、https://developers.openai.com/siwc/website 。
+
 ## 登录选择调整
 
 选择阶段使用轻量行列表，移除背景大卡片及按钮描边叠加；等待用户选择时不显示加载动画。已有账号通过 option ID 关联摘要，显示“重新登录”加姓名或邮箱；添加项显示“添加新账号”。其他授权提示保留原本含义。
@@ -19,3 +21,5 @@
 箭头使用 Tailwind group-hover 和 group-focus-visible 向右移动，transition-transform 控制过渡；motion-reduce 禁用位移与过渡。样式与行为继续使用现有 Button，不引入动画依赖。
 
 构建、Oxc tsrs 类型检查及已有浏览器工厂组件集成测试通过；合成账号的独立浏览器渲染确认“重新登录”与“添加新账号”文案及简化列表。安装包已生成，实际宿主显示与悬停交互待安装后确认。
+
+用户确认完全退出 DSH 后，官方插件 CLI 安装成功；浏览器入口、宿主入口、原生模块及 napi-rs 加载器和声明的 SHA-256 与构建产物一致。实际宿主交互等待用户确认。

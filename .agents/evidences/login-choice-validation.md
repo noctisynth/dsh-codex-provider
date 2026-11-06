@@ -20,7 +20,7 @@
 
 授权端点、response_type=code、PKCE S256、resource、稳定 host ID、环回回调及 state/nonce 均符合官方参数表。新增账号使用 dynamic_agent_client 并包含 agent_name_hint；已有账号使用保存的 issued client ID，省略 agent_name_hint，身份与邮箱 hint 均与所选记录匹配。代码交换使用同一 resource、回调及 PKCE verifier。openid 由 openidconnect 默认加入，实际 URL 验证了这一行为。来源：https://developers.openai.com/siwc/token-sharing-open-source/sign-in 。
 
-官方 discovery 声明支持 picture，但未声明 claims_parameter_supported；公开登录指南未要求额外 claims 或强制同意参数才能返回头像。因此没有依据认定缺少这些参数是根因，也未将未经验证的参数加入产品。此处“支持该声明”不等于“每个账号、客户端和授权都返回该字段”。当前证据排除了缺少 profile 请求、未获得 profile 授权及本地字段漏读，但尚未确定服务端未返回头像的具体原因，也未捕获首次 code exchange 的整份原始 HTTP 响应。Codex 显示头像的来源未被本次调查确定，不能直接推定两种授权具有相同资料可见性。
+官方 discovery 声明支持 picture，但未声明 claims_parameter_supported；公开登录指南未要求额外 claims 或强制同意参数才能返回头像。因此没有依据认定缺少这些参数是根因，也未将未经验证的参数加入产品。此处“支持该声明”不等于“每个账号、客户端和授权都返回该字段”。当前证据排除了缺少 profile 请求、未获得 profile 授权及本地字段漏读，但尚未确定服务端未返回头像的具体原因，也未捕获首次 code exchange 的整份原始 HTTP 响应。Codex 桌面客户端的取图链路见后述静态调查；不能直接推定两种授权具有相同资料可见性。
 
 ### 相近公开反馈
 
@@ -30,6 +30,24 @@
 - apache/maka PR 1950 使用 Codex device-code 流程，其头像回退测试为合成数据；不能作为真实动态注册响应必返头像的证据。来源同前述 PR。
 - Codex issue 54506 于 2026-10-16 报告头像及 Plus 权益消失，报告者选择原账号后恢复；属于账号选择问题，没有原始 token 字段证据。来源：https://github.com/openai/codex/issues/54506 。
 - Codex issue 57065 于 2026-10-26 报告头像、账号页及会话同时异常；未提供 OAuth 参数或原始 claims 证据，不能归因于 picture 返回。来源：https://github.com/openai/codex/issues/57065 。
+
+### Codex 官方客户端的头像来源
+
+2026-11-06，只读检查本机官方应用分发代码：Windows 包版本 26.1103.3517.0，应用内部版本 26.1103.31037。未读取 Codex 的账号凭据或私人会话，未控制界面，未携带凭据调用这些资料接口。以下属于静态代码观察，不是本机当前账号的实际响应或网络抓包。
+
+侧边栏 profileFooter 的个人账号分支依次选择可用图片：资料对象的 profile_details.profile_picture_url、当前用户对象的 picture、个人工作区的 profile_picture_url、尚未取得当前用户对象时保留的登录图片。团队工作区分支优先展示工作区图片。由此可确认该客户端并不只依赖 ID token 的 picture；无法仅凭静态代码确认用户截图命中了哪一项。
+
+| 数据来源 | 官方客户端的请求与字段 | 静态定位 |
+|---|---|---|
+| 资料身份 | GET https://chatgpt.com/backend-api/profiles/me ，读取 profile_details.profile_picture_url | IPsH 查询模块；根据账号资料可见性启用 |
+| 当前用户 | GET https://chatgpt.com/backend-api/me ，读取 picture、name、email | tvcH 模块的 chatGptCurrentUserQuery；缓存一分钟 |
+| 工作区资料 | GET https://chatgpt.com/backend-api/wham/accounts/check ，读取工作区 profile_picture_url | 桌面 readAccounts 及公开 BackendClient |
+
+请求链路由 Ghh3 导出 HFSu 的 Request，随后经过 GDNt 和桌面传输；生产默认基址为 https://chatgpt.com/backend-api 。桌面传输使用自身 app-server 提供的认证 token，添加 Bearer Authorization 和可用的 ChatGPT-Account-Id，并支持工作区后端路由。观察到这些实现并不等于它们具有第三方 SIWC 公开契约。
+
+另核对官方公开源码 commit f57966695fc936a1b4e5da6758ad6d532724fe83：AccountSession 虽声明用户 image_url，但当前映射直接赋 None；工作区图片另行映射 profile_picture_url。公开 Rust ProfileIdentity 类型未建模头像，不能由此推断服务端响应没有头像；桌面代码还会从 https://chatgpt.com/backend-api/wham/profiles/me 的 profile.profile_picture_url 读取资料页图片。来源：https://github.com/openai/codex/blob/f57966695fc936a1b4e5da6758ad6d532724fe83/codex-rs/app-server/src/request_processors/account_processor/workspace_switching.rs#L43 、https://github.com/openai/codex/blob/f57966695fc936a1b4e5da6758ad6d532724fe83/codex-rs/backend-client/src/client/profile.rs#L18 。
+
+公开 Codex 认证实现将后端认证提供者注明为第一方凭据；SIWC 官方 token reference 则规定本项目流程的 audience 为 https://api.openai.com/v1 ，其 app-server 接入指南配置的是独立 Responses provider。此次未找到支持 SIWC 动态客户端调用上述 backend-api 资料接口的官方公开说明，也没有对这些接口进行兼容性实测，因此不宣称必然返回 401/403。既有公开身份途径仍为经验证的 ID token 与 discovery 的 UserInfo；后者在当前账号的观察结果见前文。来源：https://github.com/openai/codex/blob/f57966695fc936a1b4e5da6758ad6d532724fe83/codex-rs/model-provider/src/auth.rs#L522 、https://developers.openai.com/siwc/token-sharing-open-source/token-reference 、https://developers.openai.com/siwc/token-sharing-open-source/codex-app-server 。
 
 ## 登录选择调整
 

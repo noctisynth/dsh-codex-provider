@@ -26,7 +26,7 @@
 - [x] 复用账号模型目录及在途读取，验证失效和失败恢复并更新安装产物；依据 EVIDENCE-009。
 - [x] 用户确认连续切换 Codex 模型表现正常，原会话继续对话未再出现 HTTP 400；依据 EVIDENCE-009。
 - [x] 接入官方目录 reasoning effort 元数据、宿主选择及默认值解析，验证并安装；依据 EVIDENCE-010。
-- [ ] 用户验证 DSH 选择器的 reasoning effort 档位显示及切换。
+- [x] 用户确认 DSH 选择器可选择 reasoning effort，切换后对话正常；依据 EVIDENCE-010。
 - [x] 实现 DSH 设置分区与插件详情配置入口，接入账号管理及正常模型目录的凭据事件；工厂和组件验证依据 EVIDENCE-008。
 - [x] 将手写代码与测试改为 TypeScript，使用 tsdown/Rolldown 构建及 Oxc tsrs 检查类型；依据 EVIDENCE-008。
 - [ ] 验证支持平台的安装与发布产物；功能缺口全部闭合后再标记生产交付。

@@ -49,6 +49,14 @@
 
 公开 Codex 认证实现将后端认证提供者注明为第一方凭据；SIWC 官方 token reference 则规定本项目流程的 audience 为 https://api.openai.com/v1 ，其 app-server 接入指南配置的是独立 Responses provider。此次未找到支持 SIWC 动态客户端调用上述 backend-api 资料接口的官方公开说明，也没有对这些接口进行兼容性实测，因此不宣称必然返回 401/403。既有公开身份途径仍为经验证的 ID token 与 discovery 的 UserInfo；后者在当前账号的观察结果见前文。来源：https://github.com/openai/codex/blob/f57966695fc936a1b4e5da6758ad6d532724fe83/codex-rs/model-provider/src/auth.rs#L522 、https://developers.openai.com/siwc/token-sharing-open-source/token-reference 、https://developers.openai.com/siwc/token-sharing-open-source/codex-app-server 。
 
+### Gravatar 说法核查
+
+2026-11-06，核查用户转述的“通过 ChatGPT 应用登录时改用 Gravatar”说法。Gravatar 官方 FAQ 明确说明 ChatGPT 使用 Gravatar 显示用户头像，文档标注更新日期为 2026-01-28；但该说明没有涉及 SIWC、ID token 或 UserInfo，不能据此确定第三方授权的头像来源和返回规则。OpenAI 当前资料页说明允许直接编辑 ChatGPT profile photo，因此不能把所有 ChatGPT 头像等同为 Gravatar。来源：https://support.gravatar.com/basic/ 、https://help.openai.com/en/articles/20001539-shareable-profiles-in-chatgpt 。
+
+对前述官方桌面版本分发脚本的静态检索发现，Avatar 组件会过滤同时包含 gravatar.com 与 cdn.auth0.com 的传入地址；这表明客户端兼容此类地址，但本次没有找到它自行按邮箱生成并请求 Gravatar 的逻辑。没有检查当前账号实际图片 URL，也没有发送用户邮箱或邮箱哈希到 Gravatar。
+
+目前可确认 ChatGPT 存在 Gravatar 这一头像来源，无法确认 SIWC 会优先使用它、用它替代当前 ChatGPT 头像，或因此省略 picture。公开身份文档仍只承诺可用的资料字段，没有要求集成方自行查询 Gravatar。该说法不作为产品新增头像回退的依据。来源：https://developers.openai.com/siwc/website 。
+
 ## 登录选择调整
 
 选择阶段使用轻量行列表，移除背景大卡片及按钮描边叠加；等待用户选择时不显示加载动画。已有账号通过 option ID 关联摘要，显示“重新登录”加姓名或邮箱；添加项显示“添加新账号”。其他授权提示保留原本含义。

@@ -1,12 +1,12 @@
 // OpenAI Blossom artwork: https://cdn.openai.com/brand/OpenAI-Logos-2025.zip
-// The OpenAI logo is a trademark of OpenAI. Original geometry and clear space retained.
+// The OpenAI logo is a trademark of OpenAI. Original geometry retained; layout supplies clear space.
 export function OpenAiLogo({ size = 40, className }: { size?: number; className?: string }) {
   return (
     <svg
       width={size}
       height={size}
       className={className}
-      viewBox="0 0 721 721"
+      viewBox="96 96 528 528"
       fill="none"
       aria-hidden="true"
       focusable="false"

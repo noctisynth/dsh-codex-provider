@@ -122,7 +122,7 @@ Semifold 管理 changeset、根 npm 版本、release PR 和发布编排。一个
 
 账号摘要在宿主 TypeScript 侧用 Node 内置 crypto 对去首尾空白、转小写的邮箱计算 SHA-256，生成可选 Gravatar 图片地址；不把派生地址写入凭据，不增加依赖或配置。图片使用 HTTPS，Gravatar 固定请求 96 像素、G 评级、无匹配图片时返回 404。React 组件依次尝试官方 picture、Gravatar，加载失败后显示姓名首字、邮箱首字或问号文本；图片不携带 Referer 或 OpenAI 凭据，不增加重试或资料查询接口。依据见 EVIDENCE-014。
 
-标题与设置导航复用一个 OpenAI 标志组件，保留官方 SVG 形状和比例；以当前文字颜色适配宿主深浅主题。导航通过 settings.section.icon 插槽按同一分区 ID 注册，并采用宿主传入的 size。SVG 随浏览器产物内联，不增加运行时远程图片请求。
+标题与设置导航复用一个 OpenAI 标志组件，保留官方 SVG 形状和比例；收紧 viewBox 至图形周围的小幅留白，使可见图形占图标框约九成，外围间距交由宿主布局提供。以当前文字颜色适配宿主深浅主题。导航通过 settings.section.icon 插槽按同一分区 ID 注册，并采用宿主传入的 size。SVG 随浏览器产物内联，不增加运行时远程图片请求。
 
 账号设置在挂载、窗口重新获得焦点及页面恢复可见时重新读取状态，登录期间保持短轮询，操作完成后显式刷新。普通成功反馈短暂显示后清除，授权进度仅在登录进行时展示。账号行不展示注册 ID；当前账号标记以凭据存在为前提。退出确认使用浏览器原生模态 dialog 的焦点管理与 Escape 行为，内部操作采用 shadcn Button 和 Tailwind；避免为单个弹窗引入第二个 React DOM 运行时。
 

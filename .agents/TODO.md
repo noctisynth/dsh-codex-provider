@@ -105,4 +105,6 @@
 - [ ] 用户验收 DSH 设置与插件配置弹窗中的 Select 选择、键盘及焦点行为，依据 EVIDENCE-024。
 - [x] 完成两侧工程治理、Biome 与 Tailwind 配置、Base UI 迁移及许可归位，通过 fmt、Clippy、tsrs、Biome、测试与必要交互验证，依据 EVIDENCE-025。
 - [x] 全部治理验证完成后统一生成变更集并本地提交，依据 EVIDENCE-025。
-- [ ] 安装后由用户验收 Base UI 组件的真实桌面交互，依据 EVIDENCE-025；当前尚未安装。
+- [x] 安装工程治理与 Base UI 更新，核对归档、10 个安装文件和原生加载，依据 EVIDENCE-025。
+- [ ] 用户验收 Base UI 组件的真实桌面交互，依据 EVIDENCE-025。
+- [x] 调研同时兼容 SIWC 与 legacy Codex 的代码改动、验证范围及维护成本；未实施 legacy，依据 EVIDENCE-026。

@@ -47,3 +47,15 @@ GET https://api.openai.com/v1/models 返回 200，目录确实包含 visibility=
 DSH 0.2.2-rc.1 的 Auto preset 则是 danger-full-access 与 ask，在 tools/pre-execute 检查每个实际原生调用及 PTC 内层调用，外层 run_code 运输调用排除；reviewer 拒绝可能转人工确认，reviewer 失败直接阻止执行。它使用固定 DSH 策略与严格 JSON 协议。跨 Provider 路由能对齐“独立审查者”的结构，但不会改变上述触发、策略、沙箱及拒绝处理，不能描述为 Codex 的完整等价机制。
 
 拟保持两项职责分离：使用 DSH 原审查机制，仅独立选择审查模型是最小改动；完全复制 Codex 的沙箱、审批触发、策略及拒绝恢复则涉及宿主权限体系，不纳入仅更换模型的实现。完整一致性不是本次可行性结论。
+
+## 保留沙箱与按需审批的后续核对
+
+用户进一步要求保留沙箱、仅在必要时审批后，核对了同版本 user-approval、sandbox、tool-bash、tool-fs 的实际发布实现。此前结论只分析了实验 Auto preset 和 llm/stream，并未穷尽宿主审批接口；“需要改变宿主权限体系”不适用于下面的公开扩展路径。
+
+ApprovalService.request 先记录 approval/asked，再在有效 policy=ask 时调用公开 approval/request waterfall，最后记录 approval/decided。allowed-once 是唯一许可结果，其他为 rejected、cancelled、unavailable；policy=never 在进入 waterfall 前拒绝。已有人工 UI 也是审批答复者，插件可以在相同接口接入模型而不修改沙箱或取消人工模式。
+
+approveEscalation 对与当前模式相同的调用不请求审批，对严格更宽的单次请求才调用 ApprovalService；allowed-once 只返回本次调用所用的模式。tool-bash 和 tool-fs 将该模式合并到本次策略对象，不调用会话 sandbox/policy 设置。模型拒绝不能通过该接口覆写成许可，沙箱拒绝且没有合法提权请求的动作也不会因模型接入自动放行。来源为目标安装附带官方发布模块，其公开包元数据：https://registry.npmjs.org/@deepseek-ai/dsh-user-approval/0.2.2-rc.1 、https://registry.npmjs.org/@deepseek-ai/dsh-sandbox/0.2.2-rc.1 。
+
+隔离试验直接执行发布代码中的 ApprovalService.request/decide、approveEscalation 和真实 Cordis waterfall；仅会话、投影状态及答复结果为合成，scopeTarget 指向试验根 Context。相同模式零审批；单次加权通过后返回目标模式，而冻结的原 workspace-write 策略未变；审批 ask/decided 成对记录；拒绝、never、预取消及 unavailable 均未取得授权。没有执行任何真实工具或改动实际配置，也没有测试操作系统沙箱 runner，不能把这项接口试验当作实际 OS 隔离验收。
+
+更新结论：保留 DSH 既有沙箱、仅在宿主要求审批时选择模型审查具备公开插件接入路径，不必启用实验 Auto，也不必修改其完全权限 preset。需要在审批入口实现独立审查者及精确请求上下文，而不是仅路由实验 Auto 的模型请求；方案由 SPEC-001 维护，未实施产品改动。

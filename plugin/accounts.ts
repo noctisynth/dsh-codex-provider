@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { credentialKey } from '@deepseek-ai/dsh-credentials'
 import { LlmError } from '@deepseek-ai/dsh-llm'
 import open from 'open'
@@ -45,7 +46,11 @@ export class Accounts {
       active: vault?.active,
       accounts: (vault?.accounts ?? []).map(record => {
         const { clientId, email, name, picture, hasCredentials, planUsageAuthorized } = native.describeSession(record)
-        return { clientId, email, name, picture, hasCredentials, planUsageAuthorized }
+        const normalizedEmail = email?.trim().toLowerCase()
+        const gravatarPicture = normalizedEmail
+          ? `https://gravatar.com/avatar/${createHash('sha256').update(normalizedEmail).digest('hex')}?s=96&d=404&r=g`
+          : undefined
+        return { clientId, email, name, picture, gravatarPicture, hasCredentials, planUsageAuthorized }
       }),
     }
   }

@@ -125,7 +125,12 @@ export function AccountSettings({
               key={account.clientId}
               className="cp:flex cp:flex-wrap cp:items-center cp:gap-3 cp:border-0 cp:border-b cp:border-solid cp:border-border cp:py-5 cp:last:border-b-0"
             >
-              <AccountAvatar name={account.name} picture={account.picture} />
+              <AccountAvatar
+                name={account.name}
+                email={account.email}
+                picture={account.picture}
+                gravatarPicture={account.gravatarPicture}
+              />
               <div className="cp:min-w-0 cp:flex-1 cp:basis-40">
                 <div className="cp:flex cp:items-center cp:gap-2">
                   <span className="cp:break-all cp:font-medium">
@@ -226,7 +231,7 @@ export function AccountSettings({
                     key={option.id}
                     size="sm"
                     variant="ghost"
-                    className="cp:group cp:h-auto cp:w-full cp:justify-between cp:gap-4 cp:px-3 cp:py-3 cp:text-left cp:whitespace-normal"
+                    className="cp:group cp:h-auto cp:w-full cp:justify-between cp:gap-4 cp:px-3 cp:has-[>svg]:pr-5 cp:py-3 cp:text-left cp:whitespace-normal"
                     disabled={busy}
                     onClick={() => act("answer", { id: option.id })}
                   >

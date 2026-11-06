@@ -13,10 +13,15 @@ import { Operations } from '../plugin/operations.ts'
 import { ChatGptClient, createHostId } from '../index.cjs'
 import { sessionRecord } from './session-fixture.mts'
 
-test('the host UI keeps credentials private and cancels a pending authorization selection', async () => {
+test('the host UI derives optional avatar fallbacks, keeps credentials private and cancels authorization selection', async () => {
   const ctx = new Context()
-  const opaque = sessionRecord()
-  let record: CredentialRecord = { kind: 'grant', payload: { hostId: createHostId(), accounts: [opaque] } }
+  const opaque = JSON.stringify({
+    ...JSON.parse(sessionRecord()),
+    email: ' MyEmailAddress@example.com ',
+    picture: 'https://example.invalid/avatar.png',
+  })
+  const withoutEmail = JSON.stringify({ ...JSON.parse(sessionRecord()), client_id: 'test-no-email', email: undefined })
+  let record: CredentialRecord = { kind: 'grant', payload: { hostId: createHostId(), accounts: [opaque, withoutEmail] } }
   class Credentials extends Service {
     constructor(ctx: Context) { super(ctx, 'credentials') }
     async readRecord() { return record }
@@ -61,7 +66,13 @@ test('the host UI keeps credentials private and cancels a pending authorization 
   }
   try {
     const result = await rpc('status')
-    assert.equal(result.ok, true)
+    assert.ok(result.ok)
+    const accountSummary = (result.value as AccountStatus).accounts
+    // The digest is Gravatar's published normalization test vector.
+    assert.equal(accountSummary[0].gravatarPicture, 'https://gravatar.com/avatar/84059b07d4be67b806386c0aad8070a23f18836bbaae342275dc0a83414c32ee?s=96&d=404&r=g')
+    assert.equal(accountSummary[0].picture, 'https://example.invalid/avatar.png')
+    assert.equal(accountSummary[1].gravatarPicture, undefined)
+    assert.deepEqual((record.payload as { accounts: string[] }).accounts, [opaque, withoutEmail])
     assert.equal(JSON.stringify(result).includes('access_token'), false)
     assert.equal(JSON.stringify(result).includes('refresh_token'), false)
     assert.equal(JSON.stringify(result).includes(opaque), false)

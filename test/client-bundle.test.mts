@@ -61,15 +61,27 @@ test('the shipped settings preserve account actions, host React sharing and styl
   } finally { await act(async () => { view?.unmount() }) }
   assert.equal(requests.find(request => request.method.endsWith('/cancel'))?.payload, null)
   running = false
-  accounts = [{ clientId: 'synthetic-account', email: 'demo@example.com', name: 'Example User', picture: 'https://example.invalid/avatar.png', hasCredentials: true, planUsageAuthorized: true }]
+  accounts = [{ clientId: 'synthetic-account', email: 'demo@example.com', name: 'Example User', picture: 'https://example.invalid/avatar.png', gravatarPicture: 'https://example.invalid/gravatar.png', hasCredentials: true, planUsageAuthorized: true }]
   try {
     await act(async () => { view = create(createElement(Settings, { rpc, embedded: true }), { createNodeMock: element => element.type === 'dialog' ? { showModal() {} } : null }) })
     assert.ok(view)
     assert.match(JSON.stringify(view.toJSON()), /Example User/)
     const avatar = view.root.findByType('img')
     assert.equal(avatar.props.referrerPolicy, 'no-referrer')
+    assert.equal(avatar.props.src, accounts[0].picture)
     await act(async () => { avatar.props.onError() })
+    const gravatar = view.root.findByType('img')
+    assert.equal(gravatar.props.src, accounts[0].gravatarPicture)
+    await act(async () => { gravatar.props.onError() })
     assert.equal(view.root.findAllByType('img').length, 0)
+    assert.ok(view.root.findAllByType('div').some(element => element.props.children === 'E'))
+    accounts = accounts.map(account => ({ ...account, picture: undefined, name: undefined, gravatarPicture: 'https://example.invalid/another-gravatar.png' }))
+    await act(async () => { windowEvents.dispatchEvent(new Event('focus')) })
+    const fallbackOnly = view.root.findByType('img')
+    assert.equal(fallbackOnly.props.src, accounts[0].gravatarPicture)
+    await act(async () => { fallbackOnly.props.onError() })
+    assert.equal(view.root.findAllByType('img').length, 0)
+    assert.ok(view.root.findAllByType('div').some(element => element.props.children === 'd'))
     const select = view.root.findAllByType('button').find(button => button.props.children === '切换账号')
     assert.ok(select)
     await act(async () => { await select.props.onClick() })

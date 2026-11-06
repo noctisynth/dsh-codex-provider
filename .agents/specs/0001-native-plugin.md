@@ -96,11 +96,13 @@ Semifold 管理 changeset、根 npm 版本、release PR 和发布编排。一个
 
 ## 验证尺度
 
-登录选择按 option ID 关联账号摘要，显示“重新登录”加姓名或邮箱；添加选项显示“添加新账号”。保留其他授权提示的原始含义。登录操作区使用单层圆角细边框、弱主题背景及内边距，与已有账号和容器外的模型说明区分；内部选项继续使用 ghost Button。箭头动画仅使用 Tailwind group-hover、transition-transform 和 motion-reduce utilities；加载指示仅用于没有待选项的授权等待。
+登录选择按 option ID 关联账号摘要，显示“重新登录”加姓名或邮箱；添加选项显示“添加新账号”。保留其他授权提示的原始含义。登录操作区使用单层圆角细边框、弱主题背景及内边距，与已有账号和容器外的模型说明区分；内部选项继续使用 ghost Button。通过 Tailwind 明确覆盖含图标按钮的右侧内边距为 20 像素，箭头右移 4 像素后仍有 16 像素留白。动画仅使用 group-hover、transition-transform 和 motion-reduce utilities；加载指示仅用于没有待选项的授权等待。
 
 取消登录复用小尺寸 outline Button，置于登录区域底部的独立操作行，靠右排列并以细分隔线和留白与选项区分。两种授权状态共用该操作行，继续调用既有取消逻辑。
 
-从经过现有 OIDC 验证的 ID token 读取可选 name、picture，与 email 一起保存并投影为账号摘要。刷新返回这些字段时更新，未返回则保留已有资料；旧会话缺字段可正常读取，通过后续登录或携带 ID token 的刷新补齐。头像仅使用 HTTPS URL，加载失败显示姓名首字或通用用户图标。前端不解析令牌，套餐位置使用邮箱。
+从经过现有 OIDC 验证的 ID token 读取可选 name、picture，与 email 一起保存并投影为账号摘要。刷新返回这些字段时更新，未返回则保留已有资料；旧会话缺字段可正常读取，通过后续登录或携带 ID token 的刷新补齐。前端不解析令牌，套餐位置使用邮箱。
+
+账号摘要在宿主 TypeScript 侧用 Node 内置 crypto 对去首尾空白、转小写的邮箱计算 SHA-256，生成可选 Gravatar 图片地址；不把派生地址写入凭据，不增加依赖或配置。图片使用 HTTPS，Gravatar 固定请求 96 像素、G 评级、无匹配图片时返回 404。React 组件依次尝试官方 picture、Gravatar，加载失败后显示姓名首字、邮箱首字或问号文本；图片不携带 Referer 或 OpenAI 凭据，不增加重试或资料查询接口。依据见 EVIDENCE-014。
 
 标题与设置导航复用一个 OpenAI 标志组件，保留官方 SVG 形状和比例；以当前文字颜色适配宿主深浅主题。导航通过 settings.section.icon 插槽按同一分区 ID 注册，并采用宿主传入的 size。SVG 随浏览器产物内联，不增加运行时远程图片请求。
 

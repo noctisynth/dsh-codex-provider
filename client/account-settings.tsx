@@ -126,7 +126,7 @@ export function AccountSettings({
               className="cp:flex cp:flex-wrap cp:items-center cp:gap-3 cp:border-0 cp:border-b cp:border-solid cp:border-border cp:py-5 cp:last:border-b-0"
             >
               <AccountAvatar name={account.name} picture={account.picture} />
-              <div className="cp:min-w-0 cp:flex-1">
+              <div className="cp:min-w-0 cp:flex-1 cp:basis-40">
                 <div className="cp:flex cp:items-center cp:gap-2">
                   <span className="cp:break-all cp:font-medium">
                     {account.name || account.email || "ChatGPT 账号"}

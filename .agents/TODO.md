@@ -109,4 +109,5 @@
 - [ ] 用户验收 Base UI 组件的真实桌面交互，依据 EVIDENCE-025。
 - [x] 调研同时兼容 SIWC 与 legacy Codex 的代码改动、验证范围及维护成本；未实施 legacy，依据 EVIDENCE-026。
 - [x] 修正 Base UI Select 收起时的文案映射，验证初始加载及切换后的全部选项显示，生成变更集并本地提交，依据 EVIDENCE-025。
-- [ ] 安装并由用户验收 Select 选中标签修复，依据 EVIDENCE-025。
+- [x] 安装 Select 选中标签修复，核对 10 个安装文件及原生加载，依据 EVIDENCE-025。
+- [ ] 用户验收 Select 选中标签修复，依据 EVIDENCE-025。

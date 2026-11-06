@@ -35,3 +35,7 @@ Rust 测试确认 HTTP 标准错误保留 status、code、param 与 requestId；
 Rust fmt、Clippy、24 项 Rust 测试、17 项 Node 测试及两套 tsrs 类型检查通过。官方 napi-rs CLI 生成 release 原生模块与绑定；Tailwind/tsdown 构建通过。现有 exFAT 增量缓存复制提示、客户端依赖内联提示和 use client 指令告警仍存在，不是本次新增构建失败。
 
 本次不安装或发布更新，不替代桌面更新验收。真实刷新轮换、远端撤销、持续背压及卸载取消的既有验证待办仍保留；没有用本次合成错误覆盖声明它们已完成。
+
+## 后续合并安装
+
+2026-11-07，用户确认 DSH 完全退出并授权安装，将三项修复与原生图片输入一起通过官方 desktop 插件 CLI 更新成功。安装文件核对及实际加载边界见 EVIDENCE-020；桌面实测仍待用户反馈。

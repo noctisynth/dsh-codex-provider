@@ -47,13 +47,13 @@ export function FeatureSettings({ form, rpc }: { form: ConfigForm<SidebarPrefere
   }
   const disabled = !!saving || snapshot.status !== 'ready' || !snapshot.writable
   return <div className="cp:mt-5 cp:border-0 cp:border-t cp:border-solid cp:border-border">
-    <SettingRow title="侧边栏账号" description="选择左下角显示的账号。ChatGPT 模式下隐藏 DeepSeek 账号菜单及提醒，可随时切回。" error={error?.key === 'sidebarAccount' ? error.message : undefined}>
+    <SettingRow title="侧边栏账号" description="切换左下角显示的账号。选择 ChatGPT 后，DeepSeek 的账号菜单与提醒会隐藏，可随时切回。" error={error?.key === 'sidebarAccount' ? error.message : undefined}>
       <SettingSelect label="侧边栏账号" value={snapshot.value?.sidebarAccount ?? 'deepseek'} options={[["deepseek", "DeepSeek"], ["chatgpt", "ChatGPT"]]} disabled={disabled} onChange={value => void save('sidebarAccount', value)} />
     </SettingRow>
-    <SettingRow title="由 ChatGPT 审批" description="保留沙箱，仅审批需要授权的操作。上下文发送至当前 ChatGPT 账号并消耗其用量；关闭后恢复人工审批。" error={error?.key === 'codexReview' ? error.message : undefined}>
+    <SettingRow title="由 ChatGPT 审批" description="使用 ChatGPT 审批需要你确认的操作，适用于所有模型，并消耗当前 ChatGPT 账号用量。关闭后由你确认。选择官方 Auto 时，由会话模型审查，不额外调用 ChatGPT 审查模型。" error={error?.key === 'codexReview' ? error.message : undefined}>
       <Switch aria-label="由 ChatGPT 审批" checked={snapshot.value?.codexReview === true} disabled={disabled} onCheckedChange={value => void save('codexReview', value)} />
     </SettingRow>
-    <SettingRow title="网页搜索" description="使用 ChatGPT 官方搜索。所有模型模式会切换共享搜索源，并额外使用 ChatGPT 用量；切回后恢复原来源。" error={error?.key === 'searchMode' ? error.message : undefined}>
+    <SettingRow title="网页搜索" description="选择使用 ChatGPT 网页搜索的模型范围。搜索消耗当前 ChatGPT 账号用量，关闭后使用 DSH 原有搜索。" error={error?.key === 'searchMode' ? error.message : undefined}>
       <SettingSelect label="网页搜索" value={snapshot.value?.searchMode ?? 'off'} options={[["off", "关闭"], ["chatgpt", "仅 ChatGPT"], ["all", "所有模型"]]} disabled={disabled} onChange={value => void save('searchMode', value)} />
     </SettingRow>
   </div>

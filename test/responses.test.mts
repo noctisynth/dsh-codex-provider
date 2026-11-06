@@ -1,7 +1,7 @@
-const { test } = require('node:test')
-const assert = require('node:assert/strict')
-const { ChatGptClient, Cancellation } = require('../index.js')
-const { sessionRecord } = require('./session-fixture.cjs')
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import { ChatGptClient, Cancellation } from '../index.cjs'
+import { sessionRecord } from './session-fixture.mts'
 
 const request = JSON.stringify({ model: 'test-model', messages: [{ role: 'user', content: [{ type: 'text', text: 'test' }] }] })
 

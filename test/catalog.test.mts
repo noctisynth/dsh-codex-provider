@@ -1,6 +1,6 @@
-const { test } = require('node:test')
-const assert = require('node:assert/strict')
-const { ChatGptClient } = require('../index.js')
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import { ChatGptClient } from '../index.cjs'
 
 test('generated loader registers the native client and async catalog method', () => {
   const client = new ChatGptClient({})

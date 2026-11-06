@@ -1,10 +1,18 @@
 import { LlmAdapter, projectImagesForTextModel, projectToolUpdates } from '@deepseek-ai/dsh-llm'
-import native from '../index.js'
+import native from '../index.cjs'
+import type { ChatGptClient } from '../index.cjs'
+import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
+import type { Accounts } from './accounts.ts'
+import type { Operations } from './operations.ts'
 
 export const provider = 'openai-codex'
 
 export class ChatGptAdapter extends LlmAdapter {
-  constructor(client, accounts, operations) {
+  client: ChatGptClient
+  accounts: Accounts
+  operations: Operations
+
+  constructor(client: ChatGptClient, accounts: Accounts, operations: Operations) {
     super()
     this.client = client
     this.accounts = accounts
@@ -25,13 +33,13 @@ export class ChatGptAdapter extends LlmAdapter {
     try {
       const record = await this.accounts.selected(operation.cancellation)
       return (await this.client.listModels(record, operation.cancellation))
-        .map(model => ({ provider, ...model, inputModalities: ['text'] }))
+        .map(model => ({ provider, ...model, inputModalities: ['text'] as const }))
     } finally { operation.close() }
   }
 
-  async *stream(options) {
+  async *stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
     const operation = this.operations.start(options.signal)
-    let reader
+    let reader: ReadableStreamDefaultReader<StreamChunk> | undefined
     try {
       const record = await this.accounts.selected(operation.cancellation)
       const projected = projectToolUpdates(options.messages, options.tools, undefined, options.toolHistory)

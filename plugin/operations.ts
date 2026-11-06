@@ -1,10 +1,11 @@
-import native from '../index.js'
+import native from '../index.cjs'
+import type { Cancellation } from '../index.cjs'
 
 /** Own native operations for both caller cancellation and Cordis disposal. */
 export class Operations {
-  #active = new Set()
+  #active = new Set<Cancellation>()
 
-  start(signal) {
+  start(signal?: AbortSignal) {
     const cancellation = new native.Cancellation()
     const abort = () => cancellation.cancel()
     this.#active.add(cancellation)

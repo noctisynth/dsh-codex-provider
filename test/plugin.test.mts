@@ -1,16 +1,23 @@
-const { test } = require('node:test')
-const assert = require('node:assert/strict')
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import type { Context as CordisContext } from '@deepseek-ai/cordis'
+import type { HostConnectionHandle } from '@deepseek-ai/dsh-client-connection'
 
 test('Cordis mounts the authorization flow and provider, then releases both on disposal', async () => {
-  const { Context } = await import('@deepseek-ai/cordis')
-  const { CredentialProvider } = await import('@deepseek-ai/dsh-credentials')
+  const { Context, Service } = await import('@deepseek-ai/cordis')
   const { LlmRuntime } = await import('@deepseek-ai/dsh-llm')
   const { AuthorizationService } = await import('@deepseek-ai/dsh-authorization')
-  const plugin = await import('../plugin/index.mjs')
-  class MemoryCredentials extends CredentialProvider {
+  const plugin = await import('../plugin/index.ts')
+  class MemoryCredentials extends Service {
+    constructor(ctx: CordisContext) { super(ctx, 'credentials') }
     async readRecord() { return undefined }
   }
   const ctx = new Context()
+  const routes = new Set<string>()
+  ctx.provide('connection', { fetch: { register(route) {
+    routes.add(route.path)
+    return () => { routes.delete(route.path) }
+  } } } as HostConnectionHandle)
   const credentials = ctx.plugin(MemoryCredentials)
   const llm = ctx.plugin(LlmRuntime)
   const authorization = ctx.plugin(AuthorizationService)
@@ -21,9 +28,11 @@ test('Cordis mounts the authorization flow and provider, then releases both on d
     assert.deepEqual(ctx.llm.listProviders(), [{ id: 'openai-codex', name: 'ChatGPT' }])
     assert.equal(ctx.authorization.list()[0].key, 'codex-provider/accounts')
     assert.deepEqual(await ctx.llm.listModels('openai-codex'), [])
+    assert.equal(routes.size, 6)
     await mounted.dispose()
     assert.deepEqual(ctx.llm.listProviders(), [])
     assert.deepEqual(ctx.authorization.list(), [])
+    assert.equal(routes.size, 0)
   } finally {
     await mounted.dispose()
     await authorization.dispose()

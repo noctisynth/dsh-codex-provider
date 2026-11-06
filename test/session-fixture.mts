@@ -1,6 +1,6 @@
-const { createHostId } = require('../index.js')
+import { createHostId } from '../index.cjs'
 
-exports.sessionRecord = () => JSON.stringify({
+export const sessionRecord = () => JSON.stringify({
   client_id: 'test-issued-client', issuer: 'https://auth.openai.com', subject: 'test-subject',
   email: 'test@example.invalid', host_id: createHostId(), id_token: 'test-id-token', nonce: 'test-nonce',
   access_token: 'test-access-token', refresh_token: 'test-refresh-token',

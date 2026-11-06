@@ -1,7 +1,7 @@
-const { test } = require('node:test')
-const assert = require('node:assert/strict')
-const { ChatGptClient, Cancellation, createHostId, describeSession } = require('../index.js')
-const { sessionRecord } = require('./session-fixture.cjs')
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import { ChatGptClient, Cancellation, createHostId, describeSession } from '../index.cjs'
+import { sessionRecord } from './session-fixture.mts'
 
 test('aborted native sign-in rejects without opening a browser or making discovery requests', async () => {
   const client = new ChatGptClient({})

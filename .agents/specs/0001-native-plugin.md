@@ -18,6 +18,8 @@ Rust 保留目录中的 supported_reasoning_levels 和 default_reasoning_level�
 
 界面重设计采用 React 与 TypeScript，保持宿主 React 运行时共享。按实际使用引入 shadcn/ui 组件，采用 Tailwind utilities；关闭插件侧 Preflight，避免重置宿主元素，使用插件专属前缀隔离工具类。颜色和字体优先映射 DSH 主题，不引入独立主题开关。仅保留 Tailwind 构建指令、必要主题映射及宿主样式装载所需的最小 CSS。组件版本与 React 18 的兼容性、Tailwind 产物的加载和样式边界须在实现时验证。
 
+账号交互状态由独立 React hook 维护，视图复用 Button、Badge、Card、Alert、Skeleton。Tailwind 4 官方 CLI 生成带 cp 前缀的样式，tsdown 官方 CSS inline 导入将其收进浏览器工厂；Cordis effect 装载样式并在卸载时移除。UI 依赖只参与构建并内联，React 与 JSX runtime 由宿主提供。主题颜色直接引用 DSH 变量，保留 Tailwind 自动生成的命名空间主题变量与运行时属性声明，不引入手写全局重置。依据及验证边界见 EVIDENCE-011。
+
 拟采用紧凑的连接状态、账号行和主操作层级，替换目前的原生按钮和内联样式；主设置页与插件配置面共用组件。加载、浏览器授权等待、账号选择和错误状态沿用现有后端契约。
 
 本地桌面验证使用文本模型能力声明。宿主负责图片占位和文件投影，工具使用非严格函数 schema，工具参数保持原始字符串。完成事件按宿主内容块关联完整 Responses output 项；后续调用重放保留项，避免重复发送推理摘要。公开目录未提供的模型能力不自行推断。

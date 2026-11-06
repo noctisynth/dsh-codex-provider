@@ -8,3 +8,4 @@ target/
 /index.d.cts
 /npm/
 /lib/
+/client/styles.generated.css

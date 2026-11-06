@@ -30,6 +30,7 @@
 - [x] 实现 DSH 设置分区与插件详情配置入口，接入账号管理及正常模型目录的凭据事件；工厂和组件验证依据 EVIDENCE-008。
 - [x] 将手写代码与测试改为 TypeScript，使用 tsdown/Rolldown 构建及 Oxc tsrs 检查类型；依据 EVIDENCE-008。
 - [ ] 验证支持平台的安装与发布产物；功能缺口全部闭合后再标记生产交付。
-- [ ] 使用 React/TypeScript、shadcn/ui 和 Tailwind 重设计设置入口；核对 React 18 兼容、宿主主题与样式隔离，并验证既有账号交互。
+- [x] 使用 React/TypeScript、shadcn/ui 和 Tailwind 重设计设置入口；完成 React 18、构建、账号交互及独立深浅主题渲染验证，依据 EVIDENCE-011。
+- [ ] 更新安装界面重设计产物，并由用户确认 DSH 设置页、插件详情页的真实主题与账号交互，依据 EVIDENCE-011。
 
 当前已实现原生授权、模型目录、Responses 及宿主适配，已获得部分桌面与真实请求证据；剩余交互及发布验收未完成，产品处于开发状态。产品成果附 changeset 和本地提交。

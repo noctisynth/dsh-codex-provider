@@ -1,0 +1,22 @@
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme) prefix(cp);
+@import "tailwindcss/utilities.css" layer(utilities) prefix(cp) source(".");
+
+@theme inline {
+  --color-background: var(--dsw-alias-bg-layer-1);
+  --color-foreground: var(--dsw-alias-label-primary);
+  --color-card: var(--dsw-alias-bg-layer-1);
+  --color-card-foreground: var(--dsw-alias-label-primary);
+  --color-primary: var(--dsw-alias-label-primary);
+  --color-primary-foreground: var(--dsw-alias-bg-layer-1);
+  --color-secondary: var(--dsw-alias-interactive-bg-hover);
+  --color-secondary-foreground: var(--dsw-alias-label-primary);
+  --color-muted: var(--dsw-alias-interactive-bg-hover);
+  --color-muted-foreground: var(--dsw-alias-label-secondary);
+  --color-accent: var(--dsw-alias-interactive-bg-hover);
+  --color-accent-foreground: var(--dsw-alias-label-primary);
+  --color-border: var(--dsw-alias-border-l2);
+  --color-input: var(--dsw-alias-border-l2);
+  --color-ring: var(--dsw-alias-brand-primary);
+  --color-destructive: var(--dsw-alias-state-error-primary);
+}

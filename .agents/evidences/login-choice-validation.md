@@ -14,6 +14,23 @@
 
 用户提供社区报告后，核对 apache/maka PR 1950 的完整 diff：subscription-auth 测试确有从 ID token 补取 picture/email 的用例，但 makeJwt 人工生成 payload，测试标头使用 alg none、签名为固定占位。因此它是解析行为证据，不能证明真实授权必返头像。项目已经请求 profile，并从经过验证的 ID token 读取 picture，不存在该报告假定的只检查 access token 的问题。官方网站登录文档将 profile 描述为返回 available claims，示例亦使用可空 picture。来源：https://github.com/apache/maka/pull/1950/files 、https://developers.openai.com/siwc/website 。
 
+### 授权参数复核
+
+通过当前原生构建产物分别生成新增账号和已有账号的授权 URL，仅检查参数匹配结果，随后取消尝试；未打开浏览器、发送授权请求、交换或刷新 token，也未改动凭据。两条分支均生成 openid profile email offline_access resource.invoke chatgpt.tokens.use.direct；当前已保存的服务端授予 scopes 也包含全部六项，并非只依据请求值推断授权成功。
+
+授权端点、response_type=code、PKCE S256、resource、稳定 host ID、环回回调及 state/nonce 均符合官方参数表。新增账号使用 dynamic_agent_client 并包含 agent_name_hint；已有账号使用保存的 issued client ID，省略 agent_name_hint，身份与邮箱 hint 均与所选记录匹配。代码交换使用同一 resource、回调及 PKCE verifier。openid 由 openidconnect 默认加入，实际 URL 验证了这一行为。来源：https://developers.openai.com/siwc/token-sharing-open-source/sign-in 。
+
+官方 discovery 声明支持 picture，但未声明 claims_parameter_supported；公开登录指南未要求额外 claims 或强制同意参数才能返回头像。因此没有依据认定缺少这些参数是根因，也未将未经验证的参数加入产品。此处“支持该声明”不等于“每个账号、客户端和授权都返回该字段”。当前证据排除了缺少 profile 请求、未获得 profile 授权及本地字段漏读，但尚未确定服务端未返回头像的具体原因，也未捕获首次 code exchange 的整份原始 HTTP 响应。Codex 显示头像的来源未被本次调查确定，不能直接推定两种授权具有相同资料可见性。
+
+### 相近公开反馈
+
+截至 2026-11-06，本次公开检索未找到证据充分、与当前动态注册流程及原始 picture 缺失完全匹配的反馈；不代表不存在该问题。
+
+- Archon PR 1973 于 2026-06-12 合并，针对 Pi 丢弃整个 ID token、导致 Codex CLI invalid ID token format；使用 Codex CLI 的固定公共 client。没有报告单独缺失 picture。来源：https://github.com/coleam00/Archon/pull/1973 。
+- apache/maka PR 1950 使用 Codex device-code 流程，其头像回退测试为合成数据；不能作为真实动态注册响应必返头像的证据。来源同前述 PR。
+- Codex issue 54506 于 2026-10-16 报告头像及 Plus 权益消失，报告者选择原账号后恢复；属于账号选择问题，没有原始 token 字段证据。来源：https://github.com/openai/codex/issues/54506 。
+- Codex issue 57065 于 2026-10-26 报告头像、账号页及会话同时异常；未提供 OAuth 参数或原始 claims 证据，不能归因于 picture 返回。来源：https://github.com/openai/codex/issues/57065 。
+
 ## 登录选择调整
 
 选择阶段使用轻量行列表，移除背景大卡片及按钮描边叠加；等待用户选择时不显示加载动画。已有账号通过 option ID 关联摘要，显示“重新登录”加姓名或邮箱；添加项显示“添加新账号”。其他授权提示保留原本含义。

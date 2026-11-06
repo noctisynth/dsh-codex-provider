@@ -75,8 +75,9 @@ export class ChatGptAdapter extends LlmAdapter {
     try {
       const record = await this.accounts.selected(operation.cancellation)
       return (await this.client.listModels(record, operation.cancellation))
-        .map(({ reasoning, ...model }) => ({
+        .map(({ reasoning, contextWindow, ...model }) => ({
           provider, ...model, inputModalities: ['text'] as const,
+          ...(contextWindow === undefined ? {} : { context: { contextWindow } }),
           ...(reasoning ? { reasoning: {
             efforts: reasoning.efforts.map(effort => ({
               ...effort,

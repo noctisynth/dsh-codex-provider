@@ -34,3 +34,5 @@
 Gravatar 官方图片服务按规范化邮箱的 SHA-256 定位头像，支持以 404 响应表示没有匹配图片；图片请求无需 OpenAI 凭据。Gravatar 头像不保证与用户当前 ChatGPT 头像一致。2026-11-06 核对，来源与限制见 EVIDENCE-014。
 
 2026-11-06 核对 DSH 0.2.2-rc.1：reasoning effort 的请求 id 与显示 name 分离；settings.launcher 支持按优先级替换整个左下角账号组件，但没有独立替换头像姓名的公开扩展点。原组件也承载 DeepSeek 账号相关提醒，替换会影响其渲染。依据 EVIDENCE-010、EVIDENCE-015。
+
+依据 EVIDENCE-016：目录的 context_window 是当前容量，DSH 通过 context.contextWindow 消费；max_context_window 不等于默认启用容量。目录 Ultra 是 Codex 客户端的推理与主动委派组合模式，公开 Responses 不接受将 ultra 直接作为 reasoning.effort；目录展示值不能一概视作普通推理请求值。

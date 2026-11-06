@@ -4,6 +4,8 @@ pub(crate) enum Error {
     Network(#[source] reqwest::Error),
     #[error("OpenAI returned HTTP {0}")]
     Http(u16),
+    #[error("OpenAI returned HTTP {status}: {message}")]
+    Api { status: u16, message: String },
     #[error("Invalid OpenAI model catalog")]
     Catalog(#[source] serde_json::Error),
     #[error("{0}")]

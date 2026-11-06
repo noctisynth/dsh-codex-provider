@@ -10,13 +10,17 @@
 
 浏览器侧按 DSH 的 dsh.client 声明和模块加载契约提供设置分区，以及插件详情配置面；复用正常模型选择器，不替换模型选择组件。界面通过宿主受信 connection 的 RPC 请求登录、账号切换、退出和安全状态，使用宿主 schema 校验 RPC 信封；后端只返回账号摘要及授权交互，不返回凭据或授权 URL。取消与卸载关闭等待中的授权交互。
 
-侧边栏展示偏好采用宿主 Config 的 volatile 字段 sidebarAccount，默认 DeepSeek，使用 configForms 订阅和写入，不自行实现持久化。选中 ChatGPT 时以优先级 -1 注册 settings.launcher，切回或插件卸载时释放注册，恢复原组件。入口遵循宿主 wide 状态，复用账号头像，显示活动且有凭据的账号；无活动登录时显示 ChatGPT 登录提示。入口仅调用公开 openSettings 打开设置，不调用宿主内部导航或复制 DeepSeek 认证菜单。账号操作完成后通知同一浏览器中的入口刷新，恢复窗口焦点时也读取最新摘要。契约及限制见 EVIDENCE-015。
+侧边栏展示偏好采用宿主 Config 的 volatile 字段 sidebarAccount，默认 DeepSeek，使用 configForms 订阅和写入，不自行实现持久化。选中 ChatGPT 时以优先级 -1 注册 settings.launcher，切回或插件卸载时释放注册，恢复原组件。入口遵循宿主 wide 状态，复用账号头像，显示活动且有凭据的账号；无活动登录时显示 ChatGPT 登录提示。入口展开 shadcn/Radix DropdownMenu 的最小菜单，设置项调用公开 openSettings，恢复项写入既有偏好，退出项复用既有确认弹窗和接口。不调用宿主内部导航或复制 DeepSeek 认证菜单。账号操作完成后通知同一浏览器中的入口刷新，恢复窗口焦点时也读取最新摘要。契约及限制见 EVIDENCE-015。
+
+菜单 Portal 使用宿主同一 React DOM 运行时，构建保持 react-dom 外置；复用 DropdownMenu 的定位、键盘、关闭及焦点管理。触发器直接应用现有 Button 样式，避免 React 18 下普通函数 Button 无法接收 Radix ref。菜单关闭后打开退出确认时协调焦点，不新增第二套退出逻辑。
 
 侧边栏展开入口采用宿主原有的 44 像素行高、6 像素内边距、8 像素图文间距和 24 像素头像，姓名 14 像素、次要信息 12 像素；折叠入口为 36 像素方形。复用宿主圆角和悬停色，不增加卡片容器。设置切换复用小尺寸 Button。
 
 适配器复用当前账号的目录结果及同一次在途请求，避免宿主模型校验与默认设置变化重复访问远端目录。本插件的凭据记录更新时失效；失败请求不缓存，不增加 TTL 配置或浏览器目录实现。
 
 Rust 保留目录中的 supported_reasoning_levels 和 default_reasoning_level，通过 napi-rs 传给宿主。适配器在精确模型解析中提供 DSH 的 reasoning 元数据，档位值视为不透明字符串并保留服务端顺序；缺少可选档位时不猜测能力。使用同一个目录缓存，取消精确解析不取消其他调用共享的目录请求。请求继续映射宿主 reasoningEffort 到 Responses 的 reasoning.effort。
+
+Rust 与 napi-rs 保留可选 context_window，适配层映射为 DSH 的 context.contextWindow。该值表示请求与响应的总容量；不使用 max_context_window 扩大当前容量，不重复扣除宿主自身的输出预算与余量。缺少字段时不猜测。公开 HTTP 错误解析标准 error.message 并连同状态码返回；非标准响应保留状态码，不显示整份响应体或凭据。依据 EVIDENCE-016。
 
 宿主适配层为已知 reasoning effort 提供可读 name，采用当前 Codex 简体中文显示文案；id、defaultEffort、服务端顺序和 description 不变。未知档位保留原名称，不添加目录之外的选项，不替换宿主模型选择器。映射与实际宿主消费方式见 EVIDENCE-010。
 

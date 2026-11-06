@@ -181,6 +181,7 @@ pub fn describe_session(record: String) -> napi::Result<AccountInfo> {
 pub struct Model {
     pub id: String,
     pub name: String,
+    pub context_window: Option<u32>,
     pub reasoning: Option<ModelReasoning>,
 }
 
@@ -202,6 +203,7 @@ impl From<models::Model> for Model {
         Self {
             id: value.id,
             name: value.name,
+            context_window: value.context_window,
             reasoning: value.reasoning.map(|reasoning| ModelReasoning {
                 default_effort: reasoning.default_effort,
                 efforts: reasoning

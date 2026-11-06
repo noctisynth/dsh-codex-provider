@@ -10,7 +10,7 @@ import { LlmRuntime, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import { setImmediate } from 'node:timers/promises'
 import { sessionRecord } from './session-fixture.mts'
 
-test('catalog metadata drives effort selection and shares reads across lookup and cancellation', async () => {
+test('catalog metadata supplies capacity and efforts and shares reads across lookup and cancellation', async () => {
   const record = sessionRecord()
   const account = describeSession(record)
   let stored: CredentialRecord = { kind: 'grant', payload: { hostId: 'fixture', active: account.clientId, accounts: [record] } }
@@ -34,7 +34,7 @@ test('catalog metadata drives effort selection and shares reads across lookup an
     requests++
     if (fail) throw new Error('catalog unavailable')
     if (gate) await gate
-    return [{ id: 'model-a', name: 'Model A', reasoning: {
+    return [{ id: 'model-a', name: 'Model A', contextWindow: 272000, reasoning: {
       defaultEffort: 'low', efforts: [
         ...['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra'].map(id => ({ id, name: id })),
         { id: 'future-level', name: 'Future display name', description: 'Provider description' },
@@ -49,9 +49,13 @@ test('catalog metadata drives effort selection and shares reads across lookup an
     const [first, second] = await Promise.all([adapter.listModels(), adapter.listModels()])
     assert.deepEqual(first, second)
     assert.deepEqual(first.map(model => model.id), ['model-a', 'model-b'])
+    assert.deepEqual(first[0].context, { contextWindow: 272000 })
+    assert.equal(first[1].context, undefined)
     await adapter.listModels()
     const route = { provider: 'openai-codex', model: 'model-a' }
-    const reasoning = (await ctx.llm.resolveModelInfo(route.provider, route.model)).reasoning
+    const resolved = await ctx.llm.resolveModelInfo(route.provider, route.model)
+    assert.deepEqual(resolved.context, { contextWindow: 272000 })
+    const reasoning = resolved.reasoning
     assert.deepEqual(reasoning?.efforts.map(({ id, name }) => [id, name]), [
       ['none', '无'], ['minimal', '极低'], ['low', '轻度'], ['medium', '中'],
       ['high', '高'], ['xhigh', '极高'], ['max', 'Max'], ['ultra', 'Ultra'],
@@ -61,6 +65,7 @@ test('catalog metadata drives effort selection and shares reads across lookup an
     assert.equal((await ctx.llm.resolveCallConfig(route)).reasoningEffort, 'low')
     assert.equal((await ctx.llm.resolveCallConfig({ ...route, reasoningEffort: ReasoningEffortId('high') })).reasoningEffort, 'high')
     assert.equal((await ctx.llm.resolveModelInfo(route.provider, 'model-b')).reasoning, undefined)
+    assert.equal((await ctx.llm.resolveModelInfo(route.provider, 'model-b')).context, undefined)
     await assert.rejects(ctx.llm.resolveCallConfig({ ...route, reasoningEffort: ReasoningEffortId('invented') }), /reasoning|effort/i)
     assert.equal(requests, 1)
     adapter.invalidateCatalog()

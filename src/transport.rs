@@ -31,7 +31,7 @@ impl Transport {
             .await
             .map_err(Error::Network)?;
         if !response.status().is_success() {
-            return Err(Error::Http(response.status().as_u16()));
+            return Err(response_error(response).await);
         }
         Ok(response)
     }
@@ -63,9 +63,68 @@ impl Transport {
             .await
             .map_err(Error::Network)?;
         if !response.status().is_success() {
-            return Err(Error::Http(response.status().as_u16()));
+            return Err(response_error(response).await);
         }
         let bytes = response.bytes().await.map_err(Error::Network)?;
         models::parse_catalog(&bytes)
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct ApiErrorResponse {
+    error: ApiErrorDetail,
+}
+
+#[derive(serde::Deserialize)]
+struct ApiErrorDetail {
+    message: String,
+}
+
+async fn response_error(response: reqwest::Response) -> Error {
+    let status = response.status().as_u16();
+    match response.bytes().await {
+        Ok(body) => parse_api_error(status, &body),
+        Err(_) => Error::Http(status),
+    }
+}
+
+fn parse_api_error(status: u16, body: &[u8]) -> Error {
+    match serde_json::from_slice::<ApiErrorResponse>(body) {
+        Ok(response) if !response.error.message.trim().is_empty() => Error::Api {
+            status,
+            message: response.error.message,
+        },
+        _ => Error::Http(status),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_api_error;
+
+    #[test]
+    fn http_error_explains_rejected_parameter_without_dumping_response() {
+        let error = parse_api_error(
+            400,
+            br#"{"error":{"message":"Invalid reasoning.effort: ultra","type":"invalid_request_error","code":"invalid_value","param":"reasoning.effort"},"extra":"not for display"}"#,
+        );
+        assert_eq!(
+            error.to_string(),
+            "OpenAI returned HTTP 400: Invalid reasoning.effort: ultra"
+        );
+    }
+
+    #[test]
+    fn nonstandard_error_bodies_keep_http_status() {
+        for body in [
+            b"<html>Service unavailable</html>".as_slice(),
+            br#"{"error":"Service unavailable"}"#,
+            br#"{"error":{"message":" "}}"#,
+        ] {
+            assert_eq!(
+                parse_api_error(503, body).to_string(),
+                "OpenAI returned HTTP 503"
+            );
+        }
     }
 }

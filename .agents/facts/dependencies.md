@@ -37,4 +37,6 @@ Gravatar 官方图片服务按规范化邮箱的 SHA-256 定位头像，支持�
 
 依据 EVIDENCE-016：目录的 context_window 是当前容量，DSH 通过 context.contextWindow 消费；max_context_window 不等于默认启用容量。目录 Ultra 是 Codex 客户端的推理与主动委派组合模式，公开 Responses 不接受将 ultra 直接作为 reasoning.effort；目录展示值不能一概视作普通推理请求值。
 
-2026-11-06，SIWC 官方界面规范包含 Fast 示例，通用 Responses API 通过 service_tier 请求 Fast；官方客户端的 ChatGPT 登录支持不能直接证明第三方动态授权的实际档位权限。同日真实合成验证中，当前 SIWC 授权在所测两个模型上拒绝 fast，priority 虽完成但实际返回 default；不能视为 Fast 已生效，也不推广为全部账号的永久限制。依据 EVIDENCE-017。
+2026-11-06，SIWC 官方界面规范包含 Fast 示例；当前账号目录对所测两个模型均声明 priority/Fast。真实合成请求拒绝 fast 字面值，priority 完成但响应字段为 default。第一方 Codex 官方反馈说明其回显不一定反映 Fast 路由，该解释尚不能直接推广到 SIWC；当前无法只凭该字段确定加速是否生效。依据 EVIDENCE-017。
+
+同日核对 SIWC 公开限制：max_output_tokens 与 temperature 不受支持；错误响应可为顶层 detail；终止刷新错误需清理不可用令牌并保留注册身份。DSH 0.2.2-rc.1 的摘要压缩会传 maxTokens，失败后压缩依赖 CONTEXT_WINDOW_EXCEEDED 分类；本项目当前映射不完整。依据 EVIDENCE-018。

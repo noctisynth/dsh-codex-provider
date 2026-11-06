@@ -35,4 +35,18 @@ fast 的第一次诊断仅查看标准 error 对象，未取得说明；随后�
 
 官方通用 API 文档允许 fast 或 priority，并要求以响应档位判断实际处理方式；部分文档对返回 fast 还是 priority 的描述存在版本范围差异，但两者都不等于本次返回的 default。来源：https://developers.openai.com/api/reference/typescript/resources/responses 、https://developers.openai.com/api/docs/guides/fast-mode 。未找到 SIWC 需要额外速度参数的公开说明。
 
-观察结论：本次账号、授权与两个模型组合没有实际获得 Fast；priority 请求成功不能视为 Fast 成功。尚不能区分服务端 SIWC 限制、账号资格或其他服务端降档因素，也不能推广为所有 SIWC 账号永久不支持。当前不足以交付有效开关；按用户既有要求停止依赖该能力的实现并询问后续方向。未改产品代码、未构建或替换安装包。
+初步结论：fast 字面值被拒绝，priority 请求成功但回显为 default；尚未取得适用于本次 SIWC 路由的实际加速证据。后续公开反馈说明不能把回显直接解释为一定没有加速，修正依据见下一节。未改产品代码、未构建或替换安装包。
+
+## 子 Agent 追查与目录核对
+
+用户随后要求子 Agent 继续调研，同时推进核心功能对照。子 Agent 只读核对公开资料，未读取凭据或发出推理请求；主 Agent 补做一次只读账号模型目录查询。
+
+官方 Codex 当前公开实现将 ServiceTier::Fast 的请求值映射为 priority，并按模型目录 service_tiers 过滤支持项。来源：https://github.com/openai/codex/blob/main/codex-rs/protocol/src/config_types.rs 、https://github.com/openai/codex/blob/main/codex-rs/protocol/src/openai_models.rs 。
+
+2026-03-10，官方 Codex 仓库贡献者 pash-openai 在 issue 14204 回复：第一方 ChatGPT 认证的 Codex Fast 由服务端路由处理，终止响应 default 不代表 Fast 被忽略。该讨论使用第一方后端 WebSocket 和旧版 Codex，不能直接套用到本项目第三方 SIWC 公共 HTTP 路由，但足以否定将所有订阅请求的 default 一概视为未加速的判断。来源：https://github.com/openai/codex/issues/14204#issuecomment-4033184620 。
+
+同日只读目录观察：gpt-6.1-sol 与 gpt-6-astra 的 service_tiers 均含 id=priority、name=Fast、description=2x speed, increased usage；additional_speed_tiers 均为 fast，default_service_tier 未提供。这是当前账号目录声明的能力，不是测得的倍速。未保存账号信息、令牌或完整目录。
+
+SIWC app-server 指南仍要求相同授权 token 和公开 Responses，限制页也明确适用于直接调用与 app-server；未发现额外 Fast scope 或专用 header，不能认为替换客户端就能改变服务端权限。来源：https://developers.openai.com/siwc/token-sharing-open-source/codex-app-server 、https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations 、https://developers.openai.com/siwc/token-sharing-open-source/sign-in 。
+
+目前结论：按目录请求 priority 有官方客户端实现及本账号目录依据，且请求能够完成；实际 Fast 路由与 default 回显在 SIWC 下的关系仍未取得直接说明。不承诺固定倍速，不改走未授权第一方后端，也不以重复短请求的耗时作为可靠判据。Fast 实施状态由 TODO-001 维护。

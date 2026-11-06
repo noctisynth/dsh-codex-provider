@@ -1,6 +1,6 @@
 # Rust 原生插件技术方案
 
-编号：SPEC-001。依据：RFC-001。状态：宿主适配已实现，桌面真实授权待验证。更新：2026-11-06。事实：FACT-002；证据：EVIDENCE-002、EVIDENCE-007。
+编号：SPEC-001。依据：RFC-001。状态：核心主链路已有实测，异常恢复与发布尚待完善。更新：2026-11-06。事实：FACT-002；证据：EVIDENCE-002、EVIDENCE-007、EVIDENCE-018。
 
 ## 组件职责
 
@@ -24,7 +24,9 @@ Rust 与 napi-rs 保留可选 context_window，适配层映射为 DSH 的 contex
 
 宿主适配层为已支持 reasoning effort 提供可读 name，采用当前 Codex 简体中文显示文案；id、有效 defaultEffort、服务端顺序和 description 不变。未知档位保留原名称，不添加目录之外的选项，不替换宿主模型选择器。映射与实际宿主消费方式见 EVIDENCE-010；Ultra 排除依据 EVIDENCE-016。
 
-Fast 使用公开 Responses 的 service_tier，与 reasoning.effort 分开。通过真实档位验证后，拟沿用宿主 Config/configForms 保存默认关闭的布尔开关，每次请求读取 volatile 配置，影响后续请求而不打断当前流；无需新的凭据或持久化服务。当前公开请求验证未满足实际 Fast 生效条件，暂不实施开关；结果及适用边界见 EVIDENCE-017，后续处理待用户决定。
+Fast 使用公开 Responses 的 service_tier，与 reasoning.effort 分开。完成适用性验证后，拟沿用宿主 Config/configForms 保存默认关闭的布尔开关，每次请求读取 volatile 配置，影响后续请求而不打断当前流；无需新的凭据或持久化服务。请求值应采用账号目录声明的档位 ID，不能把界面 Fast 名称直接当作请求值。用户已授权继续调研，当前尚未实施开关；公开契约、目录与回显边界见 EVIDENCE-017。
+
+待修复的核心适配集中在三条边界：原生请求转换不发送 SIWC 不支持的 max_output_tokens 和 temperature，仍复用 DSH 的压缩与预算；原生错误保留状态、机器码和允许展示的 message/detail，宿主层映射为已有上下文、额度与认证分类；刷新区分终止授权错误和临时失败，由既有凭据事务保存清除无效令牌后的记录并保留注册身份。以上为待落实的修复职责，不新建重试框架或凭据存储；缺口依据 EVIDENCE-018，完成状态由 TODO-001 维护。
 
 手写宿主适配和浏览器代码使用 TypeScript。tsdown 基于 Rolldown/Oxc 构建宿主 ESM 与浏览器标准 closure factory，React 由宿主提供；Oxc 的 tsrs 通过 tsconfig 检查类型。此适配仅声明宿主要求的模块入口，不实现新的浏览器模块加载器。原生构建继续完全由 napi-rs 管理。tsrs 为实验性工具，实际兼容结果由证据记录，遇到阻碍时说明，不静默替换编译器。
 

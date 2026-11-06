@@ -27,7 +27,7 @@ test('the shipped settings preserve account actions, host React sharing and styl
   assert.equal(loaded.id, 'dsh-codex-provider')
   const hostRequire = createRequire(import.meta.url)
   const plugin = loaded.factory(((name: string) => {
-    assert.ok(['react', 'react/jsx-runtime'].includes(name), `unexpected browser dependency: ${name}`)
+    assert.ok(['react', 'react/jsx-runtime', 'react-dom'].includes(name), `unexpected browser dependency: ${name}`)
     return hostRequire(name)
   }) as NodeRequire)
   const slots: { name: string; id?: string; key?: string; priority?: number }[] = []
@@ -58,7 +58,7 @@ test('the shipped settings preserve account actions, host React sharing and styl
     mutate: async () => assert.fail('unexpected mutation'),
   }
   type SettingsProps = { rpc: ClientConnectionRpc; preference: ConfigForm<SidebarPreference>; embedded: boolean }
-  type LauncherProps = SettingsLauncherOwnerProps & { rpc: ClientConnectionRpc }
+  type LauncherProps = SettingsLauncherOwnerProps & { rpc: ClientConnectionRpc; form: ConfigForm<SidebarPreference> }
   let component: ComponentType<SettingsProps> | undefined
   let launcher: ComponentType<LauncherProps> | undefined
   plugin.apply({
@@ -94,7 +94,7 @@ test('the shipped settings preserve account actions, host React sharing and styl
   running = false
   accounts = [{ clientId: 'synthetic-account', email: 'demo@example.com', name: 'Example User', picture: 'https://example.invalid/avatar.png', gravatarPicture: 'https://example.invalid/gravatar.png', hasCredentials: true, planUsageAuthorized: true }]
   try {
-    await act(async () => { view = create(createElement(Settings, { rpc, preference, embedded: true }), { createNodeMock: element => element.type === 'dialog' ? { showModal() {} } : null }) })
+    await act(async () => { view = create(createElement(Settings, { rpc, preference, embedded: true }), { createNodeMock: element => element.type === 'dialog' ? { showModal() {}, close() {} } : null }) })
     assert.ok(view)
     assert.match(JSON.stringify(view.toJSON()), /Example User/)
     const avatar = view.root.findByType('img')
@@ -140,7 +140,7 @@ test('the shipped settings preserve account actions, host React sharing and styl
   accounts = accounts.map(account => ({ ...account, name: 'Sidebar User', hasCredentials: true }))
   active = accounts[0].clientId
   try {
-    await act(async () => { view = create(createElement(Settings, { rpc, preference, embedded: false }), { createNodeMock: element => element.type === 'dialog' ? { showModal() {} } : null }) })
+    await act(async () => { view = create(createElement(Settings, { rpc, preference, embedded: false }), { createNodeMock: element => element.type === 'dialog' ? { showModal() {}, close() {} } : null }) })
     assert.equal(launcher, undefined)
     const chatgpt = view!.root.findAllByType('button').find(button => button.props.children === 'ChatGPT')
     assert.ok(chatgpt)
@@ -148,13 +148,14 @@ test('the shipped settings preserve account actions, host React sharing and styl
     assert.equal(snapshot.value?.sidebarAccount, 'chatgpt')
     assert.ok(launcher)
     let opened = 0
-    const owner: LauncherProps = { rpc, wide: true, settingsOpen: false, openSettings: () => { opened++ }, openOnboarding: () => assert.fail('unexpected onboarding') }
+    const owner: LauncherProps = { rpc, form: preference, wide: true, settingsOpen: false, openSettings: () => { opened++ }, openOnboarding: () => assert.fail('unexpected onboarding') }
     await act(async () => { sidebar = create(createElement(launcher!, owner)) })
     assert.match(JSON.stringify(sidebar!.toJSON()), /Sidebar User/)
-    await act(async () => { sidebar!.root.findByType('button').props.onClick() })
-    assert.equal(opened, 1)
+    assert.equal(sidebar!.root.findByType('button').props['aria-haspopup'], 'menu')
+    assert.equal(sidebar!.root.findByType('button').props['aria-expanded'], false)
+    assert.equal(opened, 0)
     await act(async () => { sidebar!.update(createElement(launcher!, { ...owner, wide: false })) })
-    assert.equal(sidebar!.root.findByType('button').props.title, 'Sidebar User · 设置')
+    assert.equal(sidebar!.root.findByType('button').props.title, 'Sidebar User · ChatGPT')
     const logout = view!.root.findAllByType('button').find(button => button.props.children === '退出登录')
     assert.ok(logout)
     await act(async () => { logout.props.onClick() })
@@ -162,7 +163,7 @@ test('the shipped settings preserve account actions, host React sharing and styl
     assert.ok(confirm)
     accounts = accounts.map(account => ({ ...account, hasCredentials: false }))
     await act(async () => { await confirm.props.onClick() })
-    assert.equal(sidebar!.root.findByType('button').props.title, 'ChatGPT · 设置')
+    assert.equal(sidebar!.root.findByType('button').props.title, 'ChatGPT · ChatGPT')
     const deepseek = view!.root.findAllByType('button').find(button => button.props.children === 'DeepSeek')
     assert.ok(deepseek)
     await act(async () => { await deepseek.props.onClick() })

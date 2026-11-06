@@ -18,11 +18,11 @@
 
 适配器复用当前账号的目录结果及同一次在途请求，避免宿主模型校验与默认设置变化重复访问远端目录。本插件的凭据记录更新时失效；失败请求不缓存，不增加 TTL 配置或浏览器目录实现。
 
-Rust 保留目录中的 supported_reasoning_levels 和 default_reasoning_level，通过 napi-rs 传给宿主。适配器在精确模型解析中提供 DSH 的 reasoning 元数据，档位值视为不透明字符串并保留服务端顺序；缺少可选档位时不猜测能力。使用同一个目录缓存，取消精确解析不取消其他调用共享的目录请求。请求继续映射宿主 reasoningEffort 到 Responses 的 reasoning.effort。
+Rust 解析目录中的 supported_reasoning_levels 和 default_reasoning_level，通过 napi-rs 传给宿主。过滤当前不支持的 Codex Ultra 组合模式，并省略指向 Ultra 的默认档位；保留其余服务端顺序和值，不自行补充 Max。适配器在精确模型解析中提供 DSH 的 reasoning 元数据，缺少可选档位时不猜测能力。使用同一个目录缓存，取消精确解析不取消其他调用共享的目录请求。请求继续映射宿主 reasoningEffort 到 Responses 的 reasoning.effort；已保存的 Ultra 选择交由宿主能力校验拒绝，用户重新选择支持档位，不自动替换。
 
 Rust 与 napi-rs 保留可选 context_window，适配层映射为 DSH 的 context.contextWindow。该值表示请求与响应的总容量；不使用 max_context_window 扩大当前容量，不重复扣除宿主自身的输出预算与余量。缺少字段时不猜测。公开 HTTP 错误解析标准 error.message 并连同状态码返回；非标准响应保留状态码，不显示整份响应体或凭据。依据 EVIDENCE-016。
 
-宿主适配层为已知 reasoning effort 提供可读 name，采用当前 Codex 简体中文显示文案；id、defaultEffort、服务端顺序和 description 不变。未知档位保留原名称，不添加目录之外的选项，不替换宿主模型选择器。映射与实际宿主消费方式见 EVIDENCE-010。
+宿主适配层为已支持 reasoning effort 提供可读 name，采用当前 Codex 简体中文显示文案；id、有效 defaultEffort、服务端顺序和 description 不变。未知档位保留原名称，不添加目录之外的选项，不替换宿主模型选择器。映射与实际宿主消费方式见 EVIDENCE-010；Ultra 排除依据 EVIDENCE-016。
 
 手写宿主适配和浏览器代码使用 TypeScript。tsdown 基于 Rolldown/Oxc 构建宿主 ESM 与浏览器标准 closure factory，React 由宿主提供；Oxc 的 tsrs 通过 tsconfig 检查类型。此适配仅声明宿主要求的模块入口，不实现新的浏览器模块加载器。原生构建继续完全由 napi-rs 管理。tsrs 为实验性工具，实际兼容结果由证据记录，遇到阻碍时说明，不静默替换编译器。
 

@@ -15,7 +15,7 @@ export default defineConfig([
     tsconfig: 'tsconfig.client.json',
     inputOptions: { platform: 'browser' },
     deps: {
-      neverBundle: ['react', 'react/jsx-runtime'],
+      neverBundle: ['react', 'react/jsx-runtime', 'react-dom'],
       alwaysBundle: [/^@radix-ui\//, 'class-variance-authority', 'clsx', 'lucide-react', 'tailwind-merge'],
     },
     outputOptions: {

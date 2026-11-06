@@ -76,7 +76,7 @@ export function useAccountSettings(rpc: ClientConnectionRpc) {
   async function act(
     action: Exclude<keyof AccountActions, "status">,
     payload?: { id: string },
-  ): Promise<void> {
+  ): Promise<boolean> {
     setBusy(true);
     setError("");
     setNotice("");
@@ -85,10 +85,15 @@ export function useAccountSettings(rpc: ClientConnectionRpc) {
       if (action === "login") ownedLogin.current = true;
       if (action === "logout") {
         if ((value as AccountActions["logout"]).revocationConfirmed) setNotice("已退出登录");
-        else setError("本地凭据已清除，未能确认远端授权撤销。");
+        else {
+          setError("本地凭据已清除，未能确认远端授权撤销。");
+          return false;
+        }
       }
+      return true;
     } catch (error) {
       setError(error instanceof Error ? error.message : "操作失败，请重试。");
+      return false;
     } finally {
       setBusy(false);
       window.dispatchEvent(new Event(accountStatusChanged));

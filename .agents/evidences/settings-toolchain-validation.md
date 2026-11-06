@@ -12,6 +12,8 @@
 
 本次保留现有日志和构建策略，没有为这些提示增加检查门禁、全局屏蔽警告或更换工具链。来源：https://react.dev/reference/rsc/use-client 、https://rolldown.rs/in-depth/directives 、https://tsdown.dev/options/dependencies#deps-onlybundle 、https://rolldown.rs/reference/InputOptions.checks#bundlertimings 。官方在线文档可能高于当前锁定版本；结论同时依据本次实际构建日志与产物测试。
 
+同日安装 EVIDENCE-015 更新时，另有 pnpm peer dependency 提示。只读 peers check 列出的六项均为原有宿主依赖声明；核对实际 DSH 分发版本：Cordis 4.1.0，authorization、client-connection、credentials、llm 均为 0.2.2-rc.1，浏览器静态模块表提供 React 与 React DOM 18.3.1，全部符合插件要求。桌面 profile 使用 hoisted 布局且关闭自动安装 peers；单独检查 profile 的依赖图无法反映安装包和浏览器 ModuleLoader 提供的依赖。官方 app-boot 的双来源运行时解析契约与实际分发相符。因此这是安装图中的缺失 peer 提示，不是已确认的运行时版本冲突；没有为消除此提示在 profile 中重复安装宿主服务或 React。
+
 ## 调研依据
 
 参考社区插件公开发布包 3.2.6 的浏览器伴随声明、设置分区、插件配置面与受信 Connection 请求接入方式，没有复用其认证或推理协议实现。仅注册授权流不会自动提供这些界面入口。

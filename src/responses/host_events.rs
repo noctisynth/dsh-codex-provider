@@ -1,4 +1,5 @@
 use serde_json::{Value, json};
+use std::collections::BTreeMap;
 
 use super::host_request::REPLAY_FORMAT;
 use crate::error::Error;
@@ -16,6 +17,7 @@ struct Block {
 #[derive(Default)]
 pub(super) struct Mapper {
     blocks: Vec<Block>,
+    output: BTreeMap<u64, Value>,
 }
 
 fn required<'a>(value: &'a Value, key: &str) -> Result<&'a str, Error> {
@@ -171,17 +173,29 @@ impl Mapper {
                 let index = self.block(id, part, kind, &Value::Null, &mut out);
                 self.delta(index, required(&event, "delta")?, &mut out);
             }
-            "response.output_item.done" => self.item_done(&event["item"], &mut out)?,
+            "response.output_item.done" => {
+                self.item_done(&event["item"], &mut out)?;
+                let index = event["output_index"]
+                    .as_u64()
+                    .ok_or(Error::Protocol("OpenAI output item omitted its index"))?;
+                self.output.insert(index, event["item"].clone());
+            }
             "response.completed" => {
-                let output = event["response"]["output"]
+                let completed_output = event["response"]["output"]
                     .as_array()
                     .ok_or(Error::Protocol("OpenAI completed response omitted output"))?;
-                for item in output {
+                // Subscription streams can finish with an empty output array after emitting item.done.
+                let output = if completed_output.is_empty() {
+                    self.output.values().cloned().collect::<Vec<_>>()
+                } else {
+                    completed_output.clone()
+                };
+                for item in &output {
                     self.item_done(item, &mut out)?;
                 }
                 let mut replay_blocks = vec![json!({"items":[]}); self.blocks.len()];
                 let mut pending = Vec::new();
-                for item in output {
+                for item in &output {
                     pending.push(item.clone());
                     if let Some(index) = self.blocks.iter().position(|b| item["id"] == b.item_id) {
                         replay_blocks[index] = json!({"items":std::mem::take(&mut pending)});
@@ -218,6 +232,41 @@ impl Mapper {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn empty_completion_replays_finished_items_before_their_tool_result() -> Result<(), Error> {
+        let mut mapper = Mapper::default();
+        let call = json!({"type":"function_call","id":"fc_test","call_id":"call_test","name":"lookup","arguments":"{}"});
+        let reasoning =
+            json!({"type":"reasoning","id":"rs_test","summary":[],"encrypted_content":"opaque"});
+        let mut chunks = mapper
+            .accept(json!({"type":"response.output_item.done","output_index":1,"item":call}))?;
+        chunks.extend(mapper.accept(
+            json!({"type":"response.output_item.done","output_index":0,"item":reasoning}),
+        )?);
+        chunks
+            .extend(mapper.accept(json!({"type":"response.completed","response":{"output":[]}}))?);
+        let finish = chunks
+            .iter()
+            .find(|chunk| chunk["type"] == "finish")
+            .ok_or(Error::Protocol("Test response omitted finish"))?;
+        let blocks = chunks
+            .iter()
+            .filter(|chunk| chunk["type"] == "block-end")
+            .map(|chunk| chunk["block"].clone())
+            .collect::<Vec<_>>();
+        let options = json!({"model":"test","messages":[
+            {"role":"user","content":[{"type":"text","text":"Look up the result"}]},
+            {"role":"assistant","content":blocks,"source":{"replayState":finish["replayState"]}},
+            {"role":"tool","toolCallId":"call_test","content":[{"type":"text","text":"result"}]}
+        ]});
+        let request = super::super::from_host(&options.to_string())?;
+        assert_eq!(request.input[1], reasoning);
+        assert_eq!(request.input[2], call);
+        assert_eq!(request.input[3]["type"], "function_call_output");
+        assert_eq!(request.input[3]["call_id"], request.input[2]["call_id"]);
+        Ok(())
+    }
 
     #[test]
     fn tool_stream_finishes_with_disjoint_usage_and_lossless_replay() -> Result<(), Error> {

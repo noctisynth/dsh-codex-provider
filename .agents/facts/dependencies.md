@@ -18,6 +18,8 @@
 
 技术决策由 SPEC-001 维护，不在此复制实现进度。
 
+依据 EVIDENCE-009 的流实验：目标公开模型可以在 output_item.done 中提供完整输出，同时在完成通知中返回空输出数组；不能只依赖终止通知恢复 stateless 历史。此为特定日期和请求下的观察。
+
 依据 EVIDENCE-008：tsdown 使用 Rolldown/Oxc 构建 TypeScript 产物；Oxc tsrs 是实验性的 TypeScript Rust 移植编译器，当前已验证版本为 0.22.0-ts7.1.0-beta。DSH 正常模型选择目录监听凭据记录更新，授权流注册本身不提供设置入口。
 
 补充事实，依据 EVIDENCE-007：目标 DSH 0.2.1-rc.2 提供授权流注册、账号交互 prompt、凭据事务和 LlmAdapter 注册；宿主未提供声明远端撤销的授权流接口。当前 Responses 文档说明 store=false 时默认返回加密推理资料，并要求函数调用连续上下文保留相关 output 项。适用限制：真实账号及桌面集成尚未完成。

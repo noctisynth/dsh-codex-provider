@@ -21,6 +21,9 @@ export function apply(ctx: Context): void {
     run: session => accounts.authorize(session),
   }))
   const adapter = new ChatGptAdapter(client, accounts, operations)
+  ctx.on('credentials/record-updated', key => {
+    if (key === accountsKey) adapter.invalidateCatalog()
+  })
   ctx.llm.registerAdapter([provider], adapter)
   ctx.inject(['connection', 'authorization'], child => {
     mountAccountUi(child, accounts, operations)

@@ -1,7 +1,7 @@
 import { LlmAdapter, projectImagesForTextModel, projectToolUpdates } from '@deepseek-ai/dsh-llm'
 import native from '../index.cjs'
 import type { ChatGptClient } from '../index.cjs'
-import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
+import type { GenerateOptions, StreamChunk, LlmModelInfo } from '@deepseek-ai/dsh-llm'
 import type { Accounts } from './accounts.ts'
 import type { Operations } from './operations.ts'
 
@@ -11,6 +11,7 @@ export class ChatGptAdapter extends LlmAdapter {
   client: ChatGptClient
   accounts: Accounts
   operations: Operations
+  private catalog: Promise<LlmModelInfo[]> | undefined
 
   constructor(client: ChatGptClient, accounts: Accounts, operations: Operations) {
     super()
@@ -23,7 +24,21 @@ export class ChatGptAdapter extends LlmAdapter {
     return { id: provider, name: 'ChatGPT' }
   }
 
-  async listModels() {
+  invalidateCatalog(): void {
+    this.catalog = undefined
+  }
+
+  listModels(): Promise<LlmModelInfo[]> {
+    if (this.catalog) return this.catalog
+    const request = this.loadModels()
+    this.catalog = request
+    void request.catch(() => {
+      if (this.catalog === request) this.catalog = undefined
+    })
+    return request
+  }
+
+  private async loadModels(): Promise<LlmModelInfo[]> {
     const vault = await this.accounts.read()
     if (!vault?.accounts.some(record => {
       const account = native.describeSession(record)

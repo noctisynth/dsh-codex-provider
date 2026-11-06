@@ -38,6 +38,19 @@ fn text(block: &Value) -> &str {
     block["text"].as_str().unwrap_or_default()
 }
 
+fn has_replay_items(replay: &Value) -> bool {
+    replay["response"]["trailing"]
+        .as_array()
+        .is_some_and(|items| !items.is_empty())
+        || replay["blocks"].as_array().is_some_and(|blocks| {
+            blocks.iter().any(|block| {
+                block["items"]
+                    .as_array()
+                    .is_some_and(|items| !items.is_empty())
+            })
+        })
+}
+
 pub(crate) fn from_host(json: &str) -> Result<Request, Error> {
     let options: GenerateOptions = serde_json::from_str(json)
         .map_err(|_| Error::Protocol("Invalid DSH generation request"))?;
@@ -67,7 +80,9 @@ pub(crate) fn from_host(json: &str) -> Result<Request, Error> {
             .source
             .as_ref()
             .and_then(|s| s.get("replayState"))
-            .filter(|r| message.role == "assistant" && r["response"]["format"] == REPLAY_FORMAT);
+            .filter(|r| message.role == "assistant" && r["response"]["format"] == REPLAY_FORMAT)
+            // Older empty completion snapshots must not suppress the persisted visible blocks.
+            .filter(|r| has_replay_items(r));
         for (index, block) in message.content.iter().enumerate() {
             if let Some(items) = replay.and_then(|r| r["blocks"][index]["items"].as_array()) {
                 input.extend(items.iter().cloned());
@@ -116,6 +131,23 @@ pub(crate) fn from_host(json: &str) -> Result<Request, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn empty_saved_replay_keeps_existing_text_and_tool_calls() -> Result<(), Error> {
+        let options = json!({"model":"test","messages":[
+            {"role":"assistant","content":[
+                {"type":"text","text":"Looking up"},
+                {"type":"tool-call","id":"call_test","name":"lookup","arguments":"{}"}
+            ],"source":{"replayState":{"response":{"format":REPLAY_FORMAT,"trailing":[]},"blocks":[{"items":[]},{"items":[]}]}}},
+            {"role":"tool","toolCallId":"call_test","content":[{"type":"text","text":"result"}]}
+        ]});
+        let request = from_host(&options.to_string())?;
+        assert_eq!(request.input.len(), 3);
+        assert_eq!(request.input[0]["content"], "Looking up");
+        assert_eq!(request.input[1]["type"], "function_call");
+        assert_eq!(request.input[1]["call_id"], request.input[2]["call_id"]);
+        Ok(())
+    }
 
     #[test]
     fn projects_tools_and_replays_encrypted_items_without_summary_duplication() -> Result<(), Error>

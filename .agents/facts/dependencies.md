@@ -12,8 +12,7 @@
 | 订阅推理要求公开 Responses、关闭存储和流式读取 | response.completed 才代表成功完成 |
 | napi pre-publish 默认发布平台包 | 必须明确唯一发布者并检查产物齐备 |
 | 现有插件调用 DSH 模型及凭据服务 | 第三方观察，官方宿主契约仍需核实 |
-| DSH 官方本地 provider 在跨进程锁内执行异步 modifyRecord 并原子写入 | 查询日 master 源码，目标安装版本待核对 |
-| 官方发布的本地凭据 provider 0.2.1-rc.2 具备上述刷新事务语义 | 锁等待 30 秒，不推广到任意 provider |
+| DSH 官方本地 provider 在跨进程锁内执行异步 modifyRecord 并原子写入 | 已静态核对发布包 0.2.1-rc.2；锁等待 30 秒，不推广到任意 provider |
 | 官方协议要求分开管理多个账号注册及已验证身份 | 宿主账号选择和添加交互仍待实现 |
 | napi CLI 3.10.12 生成产物使用硬链接 | exFAT 直接生成失败；临时 NTFS 输出已验证 |
 

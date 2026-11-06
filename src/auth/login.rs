@@ -1,9 +1,7 @@
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use openidconnect::{
-    AccessTokenHash, AuthorizationCode, CsrfToken, Nonce, OAuth2TokenResponse, PkceCodeChallenge,
-    PkceCodeVerifier, RedirectUrl, Scope, TokenResponse,
-    core::{CoreAuthenticationFlow, CoreProviderMetadata, CoreTokenType},
+    AuthorizationCode, CsrfToken, Nonce, OAuth2TokenResponse, PkceCodeChallenge, PkceCodeVerifier,
+    RedirectUrl, RequestTokenError, Scope,
+    core::{CoreAuthenticationFlow, CoreErrorResponseType, CoreProviderMetadata, CoreTokenType},
 };
 use tokio::sync::oneshot;
 use tokio_util::sync::CancellationToken;
@@ -11,7 +9,7 @@ use tokio_util::sync::CancellationToken;
 use super::{
     Session,
     callback::{self, Callback},
-    provider,
+    provider, renewal, verify,
 };
 use crate::error::Error;
 
@@ -24,8 +22,11 @@ pub(crate) struct PendingLogin {
     redirect: RedirectUrl,
     nonce: Nonce,
     verifier: PkceCodeVerifier,
-    receiver: oneshot::Receiver<Callback>,
+    receiver: Option<oneshot::Receiver<Callback>>,
     cancel: CancellationToken,
+    listener_cancel: CancellationToken,
+    retry_client_id: Option<String>,
+    expected_client_id: Option<String>,
 }
 
 impl Drop for PendingLogin {
@@ -39,6 +40,7 @@ pub(crate) async fn begin_login(
     host_id: String,
     previous: Option<Session>,
     cancel: CancellationToken,
+    retry_client_id: Option<String>,
 ) -> Result<PendingLogin, Error> {
     if cancel.is_cancelled() {
         return Err(Error::Auth("ChatGPT sign-in cancelled"));
@@ -62,15 +64,17 @@ pub(crate) async fn begin_login(
         _ = cancel.cancelled() => return Err(Error::Auth("ChatGPT sign-in cancelled")),
         result = provider::discover(&http) => result?,
     };
-    let client_id = previous
-        .as_ref()
-        .map(|session| session.client_id.as_str())
+    let client_id = retry_client_id
+        .as_deref()
+        .or_else(|| previous.as_ref().map(|session| session.client_id.as_str()))
         .unwrap_or(super::DYNAMIC_CLIENT);
     let client = provider::client(metadata.clone(), client_id.into())?;
+    let expected_client_id = (client_id != super::DYNAMIC_CLIENT).then(|| client_id.to_owned());
     let state = CsrfToken::new_random();
     let nonce = Nonce::new_random();
     let (challenge, verifier) = PkceCodeChallenge::new_random_sha256();
-    let (redirect, receiver) = callback::listen(state.clone(), cancel.clone()).await?;
+    let listener_cancel = cancel.child_token();
+    let (redirect, receiver) = callback::listen(state.clone(), listener_cancel.clone()).await?;
     let redirect =
         RedirectUrl::new(redirect).map_err(|_| Error::Auth("Invalid ChatGPT callback URL"))?;
     let client = client.set_redirect_uri(redirect.clone());
@@ -94,11 +98,13 @@ pub(crate) async fn begin_login(
         request = request.add_scope(Scope::new(scope.into()));
     }
     if let Some(session) = &previous {
-        request = request.add_extra_param("id_token_hint", session.id_token.clone());
+        if !session.id_token.is_empty() {
+            request = request.add_extra_param("id_token_hint", session.id_token.clone());
+        }
         if let Some(email) = &session.email {
             request = request.add_extra_param("login_hint", email.clone());
         }
-    } else {
+    } else if client_id == super::DYNAMIC_CLIENT {
         request = request.add_extra_param("agent_name_hint", "DSH Codex Provider");
     }
     let (url, _, _) = request.url();
@@ -111,15 +117,18 @@ pub(crate) async fn begin_login(
         redirect,
         nonce,
         verifier,
-        receiver,
+        receiver: Some(receiver),
         cancel,
+        listener_cancel,
+        retry_client_id: None,
+        expected_client_id,
     })
 }
 
-fn issued_client_id(callback: &Callback, previous: Option<&Session>) -> Result<String, Error> {
-    match (previous, callback.client_id.as_deref()) {
-        (Some(session), None) => Ok(session.client_id.clone()),
-        (Some(session), Some(id)) if session.client_id == id => Ok(id.into()),
+fn issued_client_id(callback: &Callback, expected: Option<&str>) -> Result<String, Error> {
+    match (expected, callback.client_id.as_deref()) {
+        (Some(id), None) => Ok(id.into()),
+        (Some(expected), Some(id)) if expected == id => Ok(id.into()),
         (Some(_), Some(_)) => Err(Error::Auth(
             "ChatGPT callback changed the selected registration",
         )),
@@ -131,7 +140,25 @@ fn issued_client_id(callback: &Callback, previous: Option<&Session>) -> Result<S
 }
 
 impl PendingLogin {
-    pub async fn complete(mut self) -> Result<Session, Error> {
+    pub fn can_retry(&self) -> bool {
+        self.retry_client_id.is_some() && !self.cancel.is_cancelled()
+    }
+
+    pub async fn restart(self, cancel: CancellationToken) -> Result<Self, Error> {
+        if !self.can_retry() {
+            return Err(Error::Auth("ChatGPT sign-in cannot be retried"));
+        }
+        begin_login(
+            self.http.clone(),
+            self.host_id.clone(),
+            self.previous.clone(),
+            cancel,
+            self.retry_client_id.clone(),
+        )
+        .await
+    }
+
+    pub async fn complete(&mut self) -> Result<Session, Error> {
         let cancel = self.cancel.clone();
         tokio::select! {
             _ = cancel.cancelled() => Err(Error::Auth("ChatGPT sign-in cancelled")),
@@ -140,55 +167,53 @@ impl PendingLogin {
     }
 
     async fn finish(&mut self) -> Result<Session, Error> {
-        let callback = (&mut self.receiver)
+        let callback = self
+            .receiver
+            .take()
+            .ok_or(Error::Auth("ChatGPT callback was already consumed"))?
             .await
             .map_err(|_| Error::Auth("ChatGPT callback listener ended"))?;
+        self.listener_cancel.cancel();
         if callback.error.is_some() {
             return Err(Error::Auth("ChatGPT authorization was not granted"));
         }
-        let client_id = issued_client_id(&callback, self.previous.as_ref())?;
+        let client_id = issued_client_id(&callback, self.expected_client_id.as_deref())?;
         let code = callback
             .code
             .ok_or(Error::Auth("ChatGPT callback did not return a code"))?;
         let client = provider::client(self.metadata.clone(), client_id.clone())?
             .set_redirect_uri(self.redirect.clone());
         let verifier = PkceCodeVerifier::new(self.verifier.secret().clone());
-        let tokens = client
+        let token_result = client
             .exchange_code(AuthorizationCode::new(code))
             .set_pkce_verifier(verifier)
             .add_extra_param("resource", super::RESOURCE)
             .request_async(&self.http)
-            .await
-            .map_err(|_| Error::Auth("ChatGPT code exchange failed; start a fresh sign-in"))?;
+            .await;
+        let tokens = match token_result {
+            Ok(tokens) => tokens,
+            Err(RequestTokenError::ServerResponse(error))
+                if error.error() == &CoreErrorResponseType::InvalidGrant =>
+            {
+                self.retry_client_id = Some(client_id);
+                return Err(Error::Auth(
+                    "ChatGPT authorization code expired; retry this sign-in",
+                ));
+            }
+            Err(_) => {
+                return Err(Error::Auth(
+                    "ChatGPT code exchange failed; start a fresh sign-in",
+                ));
+            }
+        };
         if tokens.token_type() != &CoreTokenType::Bearer {
             return Err(Error::Auth("ChatGPT returned an unsupported token type"));
         }
-        let id_token = tokens
-            .id_token()
-            .ok_or(Error::Auth("ChatGPT returned no ID token"))?;
-        let token_verifier = client.id_token_verifier();
-        let claims = id_token
-            .claims(&token_verifier, &self.nonce)
-            .map_err(|_| Error::Auth("ChatGPT ID token validation failed"))?;
-        if let Some(expected) = claims.access_token_hash() {
-            let actual = AccessTokenHash::from_token(
-                tokens.access_token(),
-                id_token
-                    .signing_alg()
-                    .map_err(|_| Error::Auth("Unsupported ChatGPT token signing algorithm"))?,
-                id_token
-                    .signing_key(&token_verifier)
-                    .map_err(|_| Error::Auth("ChatGPT token signing key is unavailable"))?,
-            )
-            .map_err(|_| Error::Auth("ChatGPT access token hash validation failed"))?;
-            if actual != *expected {
-                return Err(Error::Auth("ChatGPT access token hash did not match"));
-            }
-        }
+        let identity = verify::identity(&tokens, &client, &self.nonce)?;
         if self
             .previous
             .as_ref()
-            .is_some_and(|session| session.subject != claims.subject().as_str())
+            .is_some_and(|session| session.subject != identity.subject)
         {
             return Err(Error::Auth("ChatGPT sign-in returned a different account"));
         }
@@ -198,23 +223,15 @@ impl PendingLogin {
             .iter()
             .map(|scope| scope.as_str().to_owned())
             .collect();
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_err(|_| Error::Auth("System clock is before the Unix epoch"))?
-            .as_secs();
-        let lifetime = tokens
-            .expires_in()
-            .ok_or(Error::Auth("ChatGPT token response omitted expiry"))?;
-        let expires_at = now
-            .checked_add(lifetime.as_secs())
-            .ok_or(Error::Auth("Invalid ChatGPT token expiry"))?;
+        let expires_at = renewal::expiry(&tokens)?;
         Ok(Session {
             client_id,
-            issuer: claims.issuer().as_str().into(),
-            subject: claims.subject().as_str().into(),
-            email: claims.email().map(|email| email.as_str().into()),
+            issuer: identity.issuer,
+            subject: identity.subject,
+            email: identity.email,
             host_id: self.host_id.clone(),
-            id_token: id_token.to_string(),
+            id_token: identity.id_token,
+            nonce: self.nonce.secret().clone(),
             access_token: tokens.access_token().secret().clone(),
             refresh_token: tokens
                 .refresh_token()
@@ -229,7 +246,7 @@ impl PendingLogin {
 
 #[cfg(test)]
 mod tests {
-    use super::{Callback, Session, issued_client_id};
+    use super::{Callback, issued_client_id};
 
     fn callback(id: Option<&str>) -> Callback {
         Callback {
@@ -253,23 +270,12 @@ mod tests {
 
     #[test]
     fn reauthorization_retains_the_selected_registration() -> Result<(), crate::error::Error> {
-        let previous = Session {
-            client_id: "selected-client".into(),
-            issuer: super::super::ISSUER.into(),
-            subject: "test-subject".into(),
-            email: None,
-            host_id: String::new(),
-            id_token: String::new(),
-            access_token: String::new(),
-            refresh_token: String::new(),
-            expires_at: 0,
-            scopes: vec![],
-        };
+        let previous = "selected-client";
         assert_eq!(
-            issued_client_id(&callback(None), Some(&previous))?,
+            issued_client_id(&callback(None), Some(previous))?,
             "selected-client"
         );
-        assert!(issued_client_id(&callback(Some("different-client")), Some(&previous)).is_err());
+        assert!(issued_client_id(&callback(Some("different-client")), Some(previous)).is_err());
         Ok(())
     }
 }

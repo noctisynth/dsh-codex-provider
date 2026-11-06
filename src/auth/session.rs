@@ -11,6 +11,7 @@ pub(crate) struct Session {
     pub email: Option<String>,
     pub host_id: String,
     pub id_token: String,
+    pub nonce: String,
     pub access_token: String,
     pub refresh_token: String,
     pub expires_at: u64,
@@ -18,6 +19,15 @@ pub(crate) struct Session {
 }
 
 impl Session {
+    pub fn clear_tokens(&mut self) {
+        self.access_token.clear();
+        self.refresh_token.clear();
+        self.id_token.clear();
+        self.nonce.clear();
+        self.expires_at = 0;
+        self.scopes.clear();
+    }
+
     pub fn decode(json: &str) -> Result<Self, Error> {
         let session: Self =
             serde_json::from_str(json).map_err(|_| Error::Auth("Invalid saved ChatGPT session"))?;

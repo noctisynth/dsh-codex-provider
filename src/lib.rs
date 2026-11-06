@@ -4,6 +4,7 @@ mod models;
 mod transport;
 
 pub use binding::{
-    AccountInfo, Cancellation, ChatGptClient, LoginAttempt, LoginResult, Model, create_host_id,
+    AccountInfo, Cancellation, ChatGptClient, LoginAttempt, LoginResult, LogoutResult, Model,
+    create_host_id, describe_session,
 };
 mod auth;

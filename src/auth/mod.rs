@@ -1,9 +1,14 @@
 mod callback;
 mod login;
+mod logout;
 mod provider;
+mod renewal;
 mod session;
+mod verify;
 
 pub(crate) use login::{PendingLogin, begin_login};
+pub(crate) use logout::revoke;
+pub(crate) use renewal::renew;
 pub(crate) use session::Session;
 
 pub(crate) const ISSUER: &str = "https://auth.openai.com";

@@ -31,6 +31,22 @@ pub struct AccountInfo {
     pub subject: String,
     pub email: Option<String>,
     pub plan_usage_authorized: bool,
+    pub has_credentials: bool,
+}
+
+impl From<&auth::Session> for AccountInfo {
+    fn from(session: &auth::Session) -> Self {
+        Self {
+            client_id: session.client_id.clone(),
+            subject: session.subject.clone(),
+            email: session.email.clone(),
+            plan_usage_authorized: session
+                .scopes
+                .iter()
+                .any(|scope| scope == "chatgpt.tokens.use.direct"),
+            has_credentials: !session.access_token.is_empty() && !session.refresh_token.is_empty(),
+        }
+    }
 }
 
 #[napi(object)]
@@ -41,9 +57,26 @@ pub struct LoginResult {
     pub account: AccountInfo,
 }
 
+impl TryFrom<auth::Session> for LoginResult {
+    type Error = Error;
+
+    fn try_from(session: auth::Session) -> Result<Self, Self::Error> {
+        Ok(Self {
+            record: session.encode()?,
+            account: (&session).into(),
+        })
+    }
+}
+
+#[napi(object)]
+pub struct LogoutResult {
+    pub record: String,
+    pub revocation_confirmed: bool,
+}
+
 #[napi]
 pub struct LoginAttempt {
-    url: String,
+    url: Mutex<String>,
     pending: Mutex<Option<auth::PendingLogin>>,
     cancel: CancellationToken,
 }
@@ -56,10 +89,24 @@ impl Drop for LoginAttempt {
 
 #[napi]
 impl LoginAttempt {
+    #[napi(getter)]
+    pub fn can_retry(&self) -> napi::Result<bool> {
+        Ok(self
+            .pending
+            .lock()
+            .map_err(|_| Error::Auth("ChatGPT sign-in attempt is unavailable"))?
+            .as_ref()
+            .is_some_and(auth::PendingLogin::can_retry))
+    }
+
     /// Open with the system browser; do not log URLs containing an ID token hint.
     #[napi(getter)]
-    pub fn authorization_url(&self) -> String {
-        self.url.clone()
+    pub fn authorization_url(&self) -> napi::Result<String> {
+        Ok(self
+            .url
+            .lock()
+            .map_err(|_| Error::Auth("ChatGPT sign-in attempt is unavailable"))?
+            .clone())
     }
 
     #[napi]
@@ -69,25 +116,47 @@ impl LoginAttempt {
 
     #[napi]
     pub async fn complete(&self) -> napi::Result<LoginResult> {
-        let pending = self
+        let mut pending = self
             .pending
             .lock()
             .map_err(|_| Error::Auth("ChatGPT sign-in attempt is unavailable"))?
             .take()
             .ok_or(Error::Auth("ChatGPT sign-in attempt was already consumed"))?;
-        let session = pending.complete().await?;
-        Ok(LoginResult {
-            record: session.encode()?,
-            account: AccountInfo {
-                plan_usage_authorized: session
-                    .scopes
-                    .iter()
-                    .any(|scope| scope == "chatgpt.tokens.use.direct"),
-                client_id: session.client_id,
-                subject: session.subject,
-                email: session.email,
-            },
-        })
+        match pending.complete().await {
+            Ok(session) => Ok(LoginResult::try_from(session)?),
+            Err(error) => {
+                if pending.can_retry() {
+                    *self
+                        .pending
+                        .lock()
+                        .map_err(|_| Error::Auth("ChatGPT sign-in attempt is unavailable"))? =
+                        Some(pending);
+                }
+                Err(error.into())
+            }
+        }
+    }
+
+    /// After invalid_grant, open the returned URL for a fresh attempt using the issued client ID.
+    #[napi]
+    pub async fn retry(&self) -> napi::Result<String> {
+        let pending = self
+            .pending
+            .lock()
+            .map_err(|_| Error::Auth("ChatGPT sign-in attempt is unavailable"))?
+            .take()
+            .ok_or(Error::Auth("ChatGPT sign-in cannot be retried"))?;
+        let pending = pending.restart(self.cancel.child_token()).await?;
+        let url = pending.url.clone();
+        *self
+            .url
+            .lock()
+            .map_err(|_| Error::Auth("ChatGPT sign-in attempt is unavailable"))? = url.clone();
+        *self
+            .pending
+            .lock()
+            .map_err(|_| Error::Auth("ChatGPT sign-in attempt is unavailable"))? = Some(pending);
+        Ok(url)
     }
 }
 
@@ -95,6 +164,11 @@ impl LoginAttempt {
 #[napi]
 pub fn create_host_id() -> String {
     uuid::Uuid::new_v4().urn().to_string()
+}
+
+#[napi]
+pub fn describe_session(record: String) -> napi::Result<AccountInfo> {
+    Ok((&auth::Session::decode(&record)?).into())
 }
 
 #[napi(object)]
@@ -143,13 +217,55 @@ impl ChatGptClient {
             self.transport.client().clone(),
             host_id,
             previous,
-            cancel.clone(),
+            cancel.child_token(),
+            None,
         )
         .await?;
         Ok(LoginAttempt {
-            url: pending.url.clone(),
+            url: Mutex::new(pending.url.clone()),
             pending: Mutex::new(Some(pending)),
             cancel,
+        })
+    }
+
+    /// Call inside DSH modifyRecord; persist the returned record before using it.
+    #[napi]
+    pub async fn renew_session(
+        &self,
+        record: String,
+        cancellation: &Cancellation,
+    ) -> napi::Result<LoginResult> {
+        if cancellation.token.is_cancelled() {
+            return Err(Error::Auth("ChatGPT renewal cancelled").into());
+        }
+        let session = auth::Session::decode(&record)?;
+        let renewed = tokio::select! {
+            _ = cancellation.token.cancelled() => return Err(Error::Auth("ChatGPT renewal cancelled").into()),
+            result = tokio::time::timeout(std::time::Duration::from_secs(25), auth::renew(self.transport.client(), session)) => {
+                result.map_err(|_| Error::Auth("ChatGPT renewal timed out"))??
+            }
+        };
+        Ok(LoginResult::try_from(renewed)?)
+    }
+
+    /// Stop this account's in-flight requests before signing out, then persist the cleared record.
+    #[napi]
+    pub async fn logout_session(
+        &self,
+        record: String,
+        cancellation: &Cancellation,
+    ) -> napi::Result<LogoutResult> {
+        let mut session = auth::Session::decode(&record)?;
+        let confirmed = tokio::time::timeout(
+            std::time::Duration::from_secs(25),
+            auth::revoke(self.transport.client(), &session, &cancellation.token),
+        )
+        .await
+        .unwrap_or(false);
+        session.clear_tokens();
+        Ok(LogoutResult {
+            record: session.encode()?,
+            revocation_confirmed: confirmed,
         })
     }
 

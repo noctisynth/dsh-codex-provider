@@ -96,7 +96,7 @@ Semifold 管理 changeset、根 npm 版本、release PR 和发布编排。一个
 
 ## 验证尺度
 
-登录选择按 option ID 关联账号摘要，显示“重新登录”加姓名或邮箱；添加选项显示“添加新账号”。保留其他授权提示的原始含义。选择列表使用 ghost Button 与分隔线，箭头动画仅使用 Tailwind group-hover、transition-transform 和 motion-reduce utilities；加载指示仅用于没有待选项的授权等待。
+登录选择按 option ID 关联账号摘要，显示“重新登录”加姓名或邮箱；添加选项显示“添加新账号”。保留其他授权提示的原始含义。登录操作区使用单层圆角细边框、弱主题背景及内边距，与已有账号和容器外的模型说明区分；内部选项继续使用 ghost Button。箭头动画仅使用 Tailwind group-hover、transition-transform 和 motion-reduce utilities；加载指示仅用于没有待选项的授权等待。
 
 从经过现有 OIDC 验证的 ID token 读取可选 name、picture，与 email 一起保存并投影为账号摘要。刷新返回这些字段时更新，未返回则保留已有资料；旧会话缺字段可正常读取，通过后续登录或携带 ID token 的刷新补齐。头像仅使用 HTTPS URL，加载失败显示姓名首字或通用用户图标。前端不解析令牌，套餐位置使用邮箱。
 

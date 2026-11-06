@@ -189,7 +189,7 @@ export function AccountSettings({
         </div>
       )}
       {running && (
-        <div className="cp:mt-6 cp:border-0 cp:border-t cp:border-solid cp:border-border cp:pt-5">
+        <div className="cp:mt-5 cp:rounded-xl cp:border cp:border-solid cp:border-border cp:bg-muted/30 cp:p-4">
           <div role="status" className="cp:flex cp:items-start cp:gap-3">
             {!status?.login.prompt && (
               <LoaderCircle

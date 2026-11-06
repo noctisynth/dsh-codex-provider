@@ -6,6 +6,6 @@ mod transport;
 
 pub use binding::{
     AccountInfo, Cancellation, ChatGptClient, LoginAttempt, LoginResult, LogoutResult, Model,
-    create_host_id, describe_session,
+    ModelReasoning, ModelReasoningEffort, create_host_id, describe_session,
 };
 mod auth;

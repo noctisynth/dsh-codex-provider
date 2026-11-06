@@ -12,6 +12,8 @@
 
 适配器复用当前账号的目录结果及同一次在途请求，避免宿主模型校验与默认设置变化重复访问远端目录。本插件的凭据记录更新时失效；失败请求不缓存，不增加 TTL 配置或浏览器目录实现。
 
+Rust 保留目录中的 supported_reasoning_levels 和 default_reasoning_level，通过 napi-rs 传给宿主。适配器在精确模型解析中提供 DSH 的 reasoning 元数据，档位值视为不透明字符串并保留服务端顺序；缺少可选档位时不猜测能力。使用同一个目录缓存，取消精确解析不取消其他调用共享的目录请求。请求继续映射宿主 reasoningEffort 到 Responses 的 reasoning.effort。
+
 手写宿主适配和浏览器代码使用 TypeScript。tsdown 基于 Rolldown/Oxc 构建宿主 ESM 与浏览器标准 closure factory，React 由宿主提供；Oxc 的 tsrs 通过 tsconfig 检查类型。此适配仅声明宿主要求的模块入口，不实现新的浏览器模块加载器。原生构建继续完全由 napi-rs 管理。tsrs 为实验性工具，实际兼容结果由证据记录，遇到阻碍时说明，不静默替换编译器。
 
 本地桌面验证使用文本模型能力声明。宿主负责图片占位和文件投影，工具使用非严格函数 schema，工具参数保持原始字符串。完成事件按宿主内容块关联完整 Responses output 项；后续调用重放保留项，避免重复发送推理摘要。公开目录未提供的模型能力不自行推断。

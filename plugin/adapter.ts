@@ -1,7 +1,8 @@
-import { LlmAdapter, projectImagesForTextModel, projectToolUpdates } from '@deepseek-ai/dsh-llm'
+import { LlmAdapter, ReasoningEffortId, projectImagesForTextModel, projectToolUpdates } from '@deepseek-ai/dsh-llm'
+import { addAbortListener } from 'node:events'
 import native from '../index.cjs'
 import type { ChatGptClient } from '../index.cjs'
-import type { GenerateOptions, StreamChunk, LlmModelInfo } from '@deepseek-ai/dsh-llm'
+import type { GenerateOptions, StreamChunk, LlmResolvedModelInfo } from '@deepseek-ai/dsh-llm'
 import type { Accounts } from './accounts.ts'
 import type { Operations } from './operations.ts'
 
@@ -11,7 +12,7 @@ export class ChatGptAdapter extends LlmAdapter {
   client: ChatGptClient
   accounts: Accounts
   operations: Operations
-  private catalog: Promise<LlmModelInfo[]> | undefined
+  private catalog: Promise<LlmResolvedModelInfo[]> | undefined
 
   constructor(client: ChatGptClient, accounts: Accounts, operations: Operations) {
     super()
@@ -28,7 +29,7 @@ export class ChatGptAdapter extends LlmAdapter {
     this.catalog = undefined
   }
 
-  listModels(): Promise<LlmModelInfo[]> {
+  listModels(): Promise<LlmResolvedModelInfo[]> {
     if (this.catalog) return this.catalog
     const request = this.loadModels()
     this.catalog = request
@@ -38,7 +39,22 @@ export class ChatGptAdapter extends LlmAdapter {
     return request
   }
 
-  private async loadModels(): Promise<LlmModelInfo[]> {
+  async resolveModel(providerId: string, modelId: string, signal?: AbortSignal): Promise<LlmResolvedModelInfo> {
+    signal?.throwIfAborted()
+    let aborted: ReturnType<typeof addAbortListener> | undefined
+    try {
+      const models = await (signal ? Promise.race([
+        this.listModels(),
+        new Promise<never>((_resolve, reject) => {
+          aborted = addAbortListener(signal, () => reject(signal.reason))
+        }),
+      ]) : this.listModels())
+      signal?.throwIfAborted()
+      return models.find(model => model.id === modelId) ?? super.resolveModel(providerId, modelId, signal)
+    } finally { aborted?.[Symbol.dispose]() }
+  }
+
+  private async loadModels(): Promise<LlmResolvedModelInfo[]> {
     const vault = await this.accounts.read()
     if (!vault?.accounts.some(record => {
       const account = native.describeSession(record)
@@ -48,7 +64,13 @@ export class ChatGptAdapter extends LlmAdapter {
     try {
       const record = await this.accounts.selected(operation.cancellation)
       return (await this.client.listModels(record, operation.cancellation))
-        .map(model => ({ provider, ...model, inputModalities: ['text'] as const }))
+        .map(({ reasoning, ...model }) => ({
+          provider, ...model, inputModalities: ['text'] as const,
+          ...(reasoning ? { reasoning: {
+            efforts: reasoning.efforts.map(effort => ({ ...effort, id: ReasoningEffortId(effort.id) })),
+            ...(reasoning.defaultEffort === undefined ? {} : { defaultEffort: ReasoningEffortId(reasoning.defaultEffort) }),
+          } } : {}),
+        }))
     } finally { operation.close() }
   }
 

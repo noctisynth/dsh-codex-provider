@@ -12,12 +12,29 @@ struct CatalogModel {
     slug: String,
     display_name: String,
     visibility: String,
+    #[serde(default)]
+    supported_reasoning_levels: Vec<ReasoningEffort>,
+    default_reasoning_level: Option<String>,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+pub(crate) struct ReasoningEffort {
+    #[serde(rename = "effort")]
+    pub id: String,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, PartialEq)]
+pub(crate) struct Reasoning {
+    pub efforts: Vec<ReasoningEffort>,
+    pub default_effort: Option<String>,
 }
 
 #[derive(Debug, PartialEq)]
 pub(crate) struct Model {
     pub id: String,
     pub name: String,
+    pub reasoning: Option<Reasoning>,
 }
 
 pub(crate) fn parse_catalog(json: &[u8]) -> Result<Vec<Model>, Error> {
@@ -29,6 +46,14 @@ pub(crate) fn parse_catalog(json: &[u8]) -> Result<Vec<Model>, Error> {
         .map(|model| Model {
             id: model.slug,
             name: model.display_name,
+            reasoning: if model.supported_reasoning_levels.is_empty() {
+                None
+            } else {
+                Some(Reasoning {
+                    efforts: model.supported_reasoning_levels,
+                    default_effort: model.default_reasoning_level,
+                })
+            },
         })
         .collect())
 }
@@ -51,13 +76,48 @@ mod tests {
             vec![
                 Model {
                     id: "second".into(),
-                    name: "Second".into()
+                    name: "Second".into(),
+                    reasoning: None,
                 },
                 Model {
                     id: "first".into(),
-                    name: "First".into()
+                    name: "First".into(),
+                    reasoning: None,
                 },
             ]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn reasoning_levels_preserve_server_values_order_and_default() -> Result<(), crate::error::Error>
+    {
+        let models = parse_catalog(
+            br#"{"models":[{
+            "slug":"test","display_name":"Test","visibility":"list",
+            "default_reasoning_level":"low",
+            "supported_reasoning_levels":[
+                {"effort":"low","description":"Lighter reasoning"},
+                {"effort":"future-level","description":"Provider-defined effort"}
+            ]
+        }]}"#,
+        )?;
+        let reasoning = models[0]
+            .reasoning
+            .as_ref()
+            .ok_or(crate::error::Error::Protocol("Missing test reasoning"))?;
+        assert_eq!(reasoning.default_effort.as_deref(), Some("low"));
+        assert_eq!(
+            reasoning
+                .efforts
+                .iter()
+                .map(|effort| effort.id.as_str())
+                .collect::<Vec<_>>(),
+            ["low", "future-level"]
+        );
+        assert_eq!(
+            reasoning.efforts[1].description.as_deref(),
+            Some("Provider-defined effort")
         );
         Ok(())
     }

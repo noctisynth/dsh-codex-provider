@@ -177,6 +177,20 @@ pub fn describe_session(record: String) -> napi::Result<AccountInfo> {
 pub struct Model {
     pub id: String,
     pub name: String,
+    pub reasoning: Option<ModelReasoning>,
+}
+
+#[napi(object)]
+pub struct ModelReasoning {
+    pub efforts: Vec<ModelReasoningEffort>,
+    pub default_effort: Option<String>,
+}
+
+#[napi(object)]
+pub struct ModelReasoningEffort {
+    pub id: String,
+    pub name: String,
+    pub description: Option<String>,
 }
 
 impl From<models::Model> for Model {
@@ -184,6 +198,18 @@ impl From<models::Model> for Model {
         Self {
             id: value.id,
             name: value.name,
+            reasoning: value.reasoning.map(|reasoning| ModelReasoning {
+                default_effort: reasoning.default_effort,
+                efforts: reasoning
+                    .efforts
+                    .into_iter()
+                    .map(|effort| ModelReasoningEffort {
+                        name: effort.id.clone(),
+                        id: effort.id,
+                        description: effort.description,
+                    })
+                    .collect(),
+            }),
         }
     }
 }

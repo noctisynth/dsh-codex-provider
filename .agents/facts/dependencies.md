@@ -18,6 +18,8 @@
 
 技术决策由 SPEC-001 维护，不在此复制实现进度。
 
+依据 EVIDENCE-010：目标公开模型目录提供 supported_reasoning_levels 与 default_reasoning_level；DSH 0.2.2-rc.1 通过精确模型解析的 reasoning 元数据提供档位选择和默认值校验。档位与默认值具有模型差异，不从型号猜测。
+
 依据 EVIDENCE-009 的流实验：目标公开模型可以在 output_item.done 中提供完整输出，同时在完成通知中返回空输出数组；不能只依赖终止通知恢复 stateless 历史。此为特定日期和请求下的观察。
 
 依据 EVIDENCE-008：tsdown 使用 Rolldown/Oxc 构建 TypeScript 产物；Oxc tsrs 是实验性的 TypeScript Rust 移植编译器，当前已验证版本为 0.22.0-ts7.1.0-beta。DSH 正常模型选择目录监听凭据记录更新，授权流注册本身不提供设置入口。

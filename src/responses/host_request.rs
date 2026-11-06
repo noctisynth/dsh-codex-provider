@@ -133,6 +133,26 @@ mod tests {
     use super::*;
 
     #[test]
+    fn selected_effort_is_sent_to_responses_without_an_invented_default() -> Result<(), Error> {
+        let mut options = json!({"model":"test","messages":[]});
+        assert!(
+            from_host(&options.to_string())?
+                .reasoning
+                .as_ref()
+                .is_some_and(|value| value.get("effort").is_none())
+        );
+        options["reasoningEffort"] = json!("future-level");
+        assert_eq!(
+            from_host(&options.to_string())?
+                .reasoning
+                .as_ref()
+                .map(|value| &value["effort"]),
+            Some(&json!("future-level"))
+        );
+        Ok(())
+    }
+
+    #[test]
     fn empty_saved_replay_keeps_existing_text_and_tool_calls() -> Result<(), Error> {
         let options = json!({"model":"test","messages":[
             {"role":"assistant","content":[

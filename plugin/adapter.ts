@@ -8,6 +8,7 @@ import type { Operations } from './operations.ts'
 import type { AttachmentStore } from '@deepseek-ai/dsh-attachment'
 import { projectImages } from './images.ts'
 import { providerError } from './errors.ts'
+import type { SearchMode } from '../shared/features.ts'
 import type { NativeStreamChunk } from './errors.ts'
 
 export const provider = 'openai-codex'
@@ -22,19 +23,23 @@ const reasoningEffortNames = new Map([
   ['max', 'Max'],
 ])
 
+type CatalogEntry = LlmResolvedModelInfo & { hidden?: boolean; autoReviewModelOverride?: string }
+
 export class ChatGptAdapter extends LlmAdapter {
   client: ChatGptClient
   accounts: Accounts
   operations: Operations
   private attachments?: Pick<AttachmentStore, 'readImage'>
-  private catalog: Promise<LlmResolvedModelInfo[]> | undefined
+  private catalog: Promise<CatalogEntry[]> | undefined
+  private searchMode: () => SearchMode
 
-  constructor(client: ChatGptClient, accounts: Accounts, operations: Operations, attachments?: Pick<AttachmentStore, 'readImage'>) {
+  constructor(client: ChatGptClient, accounts: Accounts, operations: Operations, attachments?: Pick<AttachmentStore, 'readImage'>, searchMode: () => SearchMode = () => 'off') {
     super()
     this.client = client
     this.accounts = accounts
     this.operations = operations
     this.attachments = attachments
+    this.searchMode = searchMode
   }
 
   providerInfo() {
@@ -45,7 +50,11 @@ export class ChatGptAdapter extends LlmAdapter {
     this.catalog = undefined
   }
 
-  listModels(): Promise<LlmResolvedModelInfo[]> {
+  async listModels(): Promise<LlmResolvedModelInfo[]> {
+    return (await this.models()).filter(model => !model.hidden)
+  }
+
+  private models(): Promise<CatalogEntry[]> {
     if (this.catalog) return this.catalog
     const request = this.loadModels()
     this.catalog = request
@@ -66,16 +75,15 @@ export class ChatGptAdapter extends LlmAdapter {
         }),
       ]) : this.listModels())
       signal?.throwIfAborted()
-      return models.find(model => model.id === modelId) ?? super.resolveModel(providerId, modelId, signal)
+      const visible = models.find(model => model.id === modelId)
+      if (visible) return visible
+      const hidden = (await this.models()).find(model => model.hidden && model.id === modelId)
+      return hidden ?? super.resolveModel(providerId, modelId, signal)
     } finally { aborted?.[Symbol.dispose]() }
   }
 
-  private async loadModels(): Promise<LlmResolvedModelInfo[]> {
-    const vault = await this.accounts.read()
-    if (!vault?.accounts.some(record => {
-      const account = native.describeSession(record)
-      return account.clientId === vault.active && account.hasCredentials
-    })) return []
+  private async loadModels(): Promise<CatalogEntry[]> {
+    if (!await this.hasCredentials()) return []
     const operation = this.operations.start()
     try {
       const record = await this.accounts.selected(operation.cancellation)
@@ -84,24 +92,49 @@ export class ChatGptAdapter extends LlmAdapter {
           provider, ...model, inputModalities: inputModalities?.includes('image') ? ['text', 'image'] as const : ['text'] as const,
           ...(contextWindow === undefined ? {} : { context: { contextWindow } }),
           ...(reasoning ? { reasoning: {
-            efforts: reasoning.efforts.map(effort => ({
-              ...effort,
-              id: ReasoningEffortId(effort.id),
-              name: reasoningEffortNames.get(effort.id) ?? effort.name,
-            })),
+            efforts: reasoning.efforts.map(effort => ({ ...effort, id: ReasoningEffortId(effort.id), name: reasoningEffortNames.get(effort.id) ?? effort.name })),
             ...(reasoning.defaultEffort === undefined ? {} : { defaultEffort: ReasoningEffortId(reasoning.defaultEffort) }),
           } } : {}),
         }))
     } finally { operation.close() }
   }
 
+  async hasCredentials(): Promise<boolean> {
+    const vault = await this.accounts.read()
+    return !!vault?.accounts.some(record => {
+      const account = native.describeSession(record)
+      return account.clientId === vault.active && account.hasCredentials
+    })
+  }
+
+  async reviewModel(parentModel?: string): Promise<LlmResolvedModelInfo> {
+    const models = await this.models()
+    const id = models.find(model => model.id === parentModel)?.autoReviewModelOverride ?? 'codex-auto-review'
+    const selected = models.find(model => model.id === id)
+    if (!selected) throw new Error('当前 ChatGPT 账号未提供自动审查模型，请检查登录状态。')
+    return selected
+  }
+
   async *stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
+    const webSearch = this.searchMode() !== 'off' && options.purpose === undefined
+    yield* this.request(options, { webSearch })
+  }
+
+  async *search(query: string, signal?: AbortSignal): AsyncIterable<StreamChunk> {
+    const model = (await this.listModels())[0]
+    if (!model) throw new Error('请先登录 ChatGPT 后再使用搜索。')
+    yield* this.request({ provider, model: model.id, messages: [{ role: 'user', content: [{ type: 'text', text: query }] }],
+      system: 'Use web search to answer the query. Return a concise answer with source citations.', purpose: 'web-search', signal }, { webSearch: true, searchOnly: true })
+  }
+
+  private async *request(options: GenerateOptions, features: { webSearch: boolean; searchOnly?: boolean }): AsyncIterable<StreamChunk> {
     const operation = this.operations.start(options.signal)
     let reader: ReadableStreamDefaultReader<NativeStreamChunk> | undefined
     try {
       const record = await this.accounts.selected(operation.cancellation)
       const projected = projectToolUpdates(options.messages, options.tools, undefined, options.toolHistory)
       const request = {
+        ...features,
         model: options.model,
         messages: await projectImages(projected.messages, this.attachments, options.signal),
         tools: projected.tools,

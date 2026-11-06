@@ -12,8 +12,9 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { cn } from "./lib/utils.ts";
 import { LogoutConfirmation } from "./logout-confirmation.tsx";
 import { useAccountSettings } from "./use-account-settings.ts";
+import { setPreference } from "./preferences.ts";
 
-export function SidebarAccountPreference({ form }: { form: ConfigForm<SidebarPreference> }) {
+export function SidebarAccountPreference({ form, rpc }: { form: ConfigForm<SidebarPreference>; rpc: ClientConnectionRpc }) {
   const snapshot = useSyncExternalStore(listener => form.subscribe(listener), () => form.getSnapshot());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -21,7 +22,7 @@ export function SidebarAccountPreference({ form }: { form: ConfigForm<SidebarPre
     setSaving(true);
     setError("");
     try {
-      if (!await form.set("sidebarAccount", value)) setError("未能保存侧边栏显示设置，请重试。");
+      await setPreference(rpc, "sidebarAccount", value);
     } catch {
       setError("未能保存侧边栏显示设置，请重试。");
     } finally {
@@ -70,7 +71,7 @@ export function ChatGptLauncher({ rpc, form, wide, openSettings, settingsShortcu
     setSaving(true);
     setPreferenceError("");
     try {
-      if (!await form.set("sidebarAccount", "deepseek")) setPreferenceError("未能保存侧边栏显示设置，请重试。");
+      await setPreference(rpc, "sidebarAccount", "deepseek");
     } catch {
       setPreferenceError("未能保存侧边栏显示设置，请重试。");
     } finally {
@@ -156,8 +157,9 @@ export function mountSidebarAccount(ctx: Context, rpc: ClientConnectionRpc, form
           ChatGptLauncher,
         );
       } else {
-        dispose?.();
+        const release = dispose;
         dispose = undefined;
+        release?.();
       }
     };
     const unsubscribe = form.subscribe(sync);

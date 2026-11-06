@@ -12,6 +12,7 @@ struct CatalogModel {
     slug: String,
     display_name: String,
     visibility: String,
+    auto_review_model_override: Option<String>,
     context_window: Option<u32>,
     input_modalities: Option<Vec<String>>,
     #[serde(default)]
@@ -36,6 +37,8 @@ pub(crate) struct Reasoning {
 pub(crate) struct Model {
     pub id: String,
     pub name: String,
+    pub hidden: bool,
+    pub auto_review_model_override: Option<String>,
     pub context_window: Option<u32>,
     pub input_modalities: Option<Vec<String>>,
     pub reasoning: Option<Reasoning>,
@@ -43,10 +46,19 @@ pub(crate) struct Model {
 
 pub(crate) fn parse_catalog(json: &[u8]) -> Result<Vec<Model>, Error> {
     let catalog: Catalog = serde_json::from_slice(json).map_err(Error::Catalog)?;
+    let reviewers: Vec<_> = catalog
+        .models
+        .iter()
+        .filter_map(|m| m.auto_review_model_override.clone())
+        .collect();
     Ok(catalog
         .models
         .into_iter()
-        .filter(|model| model.visibility == "list")
+        .filter(|model| {
+            model.visibility == "list"
+                || model.slug == "codex-auto-review"
+                || reviewers.contains(&model.slug)
+        })
         .map(|mut model| {
             // Ultra requires Codex multi-agent orchestration, not a Responses effort.
             model
@@ -55,6 +67,8 @@ pub(crate) fn parse_catalog(json: &[u8]) -> Result<Vec<Model>, Error> {
             Model {
                 id: model.slug,
                 name: model.display_name,
+                hidden: model.visibility != "list",
+                auto_review_model_override: model.auto_review_model_override,
                 context_window: model.context_window,
                 input_modalities: model.input_modalities,
                 reasoning: if model.supported_reasoning_levels.is_empty() {
@@ -91,6 +105,8 @@ mod tests {
                 Model {
                     id: "second".into(),
                     name: "Second".into(),
+                    hidden: false,
+                    auto_review_model_override: None,
                     context_window: Some(272000),
                     input_modalities: Some(vec!["text".into(), "image".into()]),
                     reasoning: None,
@@ -98,6 +114,8 @@ mod tests {
                 Model {
                     id: "first".into(),
                     name: "First".into(),
+                    hidden: false,
+                    auto_review_model_override: None,
                     context_window: None,
                     input_modalities: None,
                     reasoning: None,
@@ -161,6 +179,26 @@ mod tests {
             ["high"]
         );
         assert_eq!(models[2].reasoning, None);
+        Ok(())
+    }
+
+    #[test]
+    fn hidden_review_models_and_overrides_remain_resolvable() -> Result<(), crate::error::Error> {
+        let models = parse_catalog(
+            br#"{"models":[
+            {"slug":"visible","display_name":"Visible","visibility":"list","auto_review_model_override":"special-review"},
+            {"slug":"codex-auto-review","display_name":"Reviewer","visibility":"hide"},
+            {"slug":"special-review","display_name":"Special","visibility":"hide"},
+            {"slug":"other-hidden","display_name":"Other","visibility":"hide"}
+        ]}"#,
+        )?;
+        assert_eq!(models.len(), 3);
+        assert!(!models[0].hidden);
+        assert_eq!(
+            models[0].auto_review_model_override.as_deref(),
+            Some("special-review")
+        );
+        assert!(models[1].hidden && models[2].hidden);
         Ok(())
     }
 

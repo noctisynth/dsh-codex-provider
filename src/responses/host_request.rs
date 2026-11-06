@@ -14,6 +14,10 @@ struct GenerateOptions {
     system: Option<String>,
     tools: Option<Vec<Tool>>,
     reasoning_effort: Option<String>,
+    #[serde(default)]
+    web_search: bool,
+    #[serde(default)]
+    search_only: bool,
 }
 
 #[derive(Deserialize)]
@@ -110,26 +114,33 @@ pub(crate) fn from_host(json: &str) -> Result<Request, Error> {
             input.extend(items.iter().cloned());
         }
     }
+    let mut tools: Vec<_> = options
+        .tools
+        .unwrap_or_default()
+        .into_iter()
+        .map(|t| {
+            json!({
+                "type":"function","name":t.name,"description":t.description,
+                "parameters":t.parameters,"strict":false
+            })
+        })
+        .collect();
+    if options.web_search {
+        tools.push(json!({"type":"web_search"}));
+    }
     Ok(Request {
         model: options.model,
         input,
         instructions: options.system,
-        tools: options.tools.map(|tools| {
-            tools
-                .into_iter()
-                .map(|t| {
-                    json!({
-                        "type":"function","name":t.name,"description":t.description,
-                        "parameters":t.parameters,"strict":false
-                    })
-                })
-                .collect()
-        }),
+        tools: if tools.is_empty() { None } else { Some(tools) },
+        tool_choice: options.search_only.then(|| json!({"type":"web_search"})),
         reasoning: Some(match options.reasoning_effort {
             Some(effort) => json!({"summary":"auto","effort":effort}),
             None => json!({"summary":"auto"}),
         }),
-        include: None,
+        include: options
+            .web_search
+            .then(|| vec!["web_search_call.action.sources".into()]),
     })
 }
 
@@ -207,6 +218,25 @@ mod tests {
                 .as_ref()
                 .map(|value| &value["effort"]),
             Some(&json!("future-level"))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn search_tools_are_opt_in_and_forced_only_for_dedicated_search()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut options = json!({"model":"test","messages":[]});
+        let ordinary = serde_json::to_value(from_host(&options.to_string())?)?;
+        assert!(ordinary.get("tool_choice").is_none());
+        options["webSearch"] = json!(true);
+        options["searchOnly"] = json!(true);
+        let search = serde_json::to_value(from_host(&options.to_string())?)?;
+        assert_eq!(search["tools"][0]["type"], "web_search");
+        assert_eq!(search["tool_choice"]["type"], "web_search");
+        assert!(
+            search["include"]
+                .as_array()
+                .is_some_and(|items| items.contains(&json!("web_search_call.action.sources")))
         );
         Ok(())
     }

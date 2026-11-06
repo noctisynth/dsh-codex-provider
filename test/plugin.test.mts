@@ -29,7 +29,7 @@ test('Cordis mounts the authorization flow and provider, then releases both on d
     assert.deepEqual(ctx.llm.listProviders(), [{ id: 'openai-codex', name: 'ChatGPT' }])
     assert.equal(ctx.authorization.list()[0].key, 'codex-provider/accounts')
     assert.deepEqual(await ctx.llm.listModels('openai-codex'), [])
-    assert.equal(routes.size, 6)
+    assert.equal(routes.size, 7)
     await mounted.dispose()
     assert.deepEqual(ctx.llm.listProviders(), [])
     assert.deepEqual(ctx.authorization.list(), [])

@@ -2,6 +2,8 @@ mod binding;
 mod error;
 mod models;
 mod responses;
+mod review;
+pub use review::parse_review_decision;
 mod transport;
 
 pub use binding::{

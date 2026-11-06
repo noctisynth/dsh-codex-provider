@@ -15,7 +15,7 @@ function selectedId(payload: unknown): string {
 }
 
 /** Safe UI projection of the host-owned authorization flow. No credential or URL crosses this face. */
-export function mountAccountUi(ctx: Context, accounts: Accounts, operations: Operations): void {
+export function mountAccountUi(ctx: Context, accounts: Accounts, operations: Operations, savePreference?: (payload: unknown) => Promise<void>): void {
   let login: LoginState = { running: false }
   let pendingPrompt: ((id: string) => void) | undefined
   let controller: AbortController | undefined
@@ -43,6 +43,11 @@ export function mountAccountUi(ctx: Context, accounts: Accounts, operations: Ope
   async function dispatch(action: string, payload: unknown, signal: AbortSignal): Promise<unknown> {
     switch (action) {
       case 'status': return { ...(await accounts.summary()), login }
+      case 'preference': {
+        if (!savePreference) throw new Error('宿主设置暂不可编辑。')
+        await savePreference(payload)
+        return null
+      }
       case 'login': {
         if (login.running) throw new Error('ChatGPT 登录正在进行。')
         const attemptController = controller = new AbortController()
@@ -87,7 +92,7 @@ export function mountAccountUi(ctx: Context, accounts: Accounts, operations: Ope
   }
 
   ctx.effect(() => () => controller?.abort())
-  for (const action of ['status', 'login', 'answer', 'cancel', 'select', 'logout']) {
+  for (const action of ['status', 'login', 'answer', 'cancel', 'select', 'logout', 'preference']) {
     const method = `codex-provider/${action}`
     ctx.effect(() => ctx.connection.fetch.register({
       path: `/api/${method}`, methods: ['POST'], requestBody: 'buffered',
@@ -105,7 +110,7 @@ export function mountAccountUi(ctx: Context, accounts: Accounts, operations: Ope
           request.signal.throwIfAborted()
           result = { ok: true, value: await dispatch(action, parsed.data.payload, request.signal) }
         } catch {
-          result = { ok: false, error: { code: 'chatgpt-operation-failed', message: 'ChatGPT 操作失败，请检查登录状态后重试。', details: {} } }
+          result = { ok: false, error: { code: 'chatgpt-operation-failed', message: action === 'preference' ? '设置保存失败，请稍后重试。' : 'ChatGPT 操作失败，请检查登录状态后重试。', details: {} } }
         }
         return Response.json({ type: 'server-response', rpcId: parsed.data.rpcId, result })
       },

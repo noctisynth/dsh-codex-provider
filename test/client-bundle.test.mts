@@ -39,6 +39,11 @@ test('the shipped settings preserve account actions, host React sharing and styl
     requests.push({ method, payload })
     // Match Connection's JSON wire boundary and the Host's real envelope validator.
     clientRequestSchema.parse(JSON.parse(JSON.stringify({ type: 'client-request', rpcId: 'test', method, payload })))
+    if (method.endsWith('/preference')) {
+      const change = payload as { key: keyof SidebarPreference; value: never }
+      snapshot = { ...snapshot, value: { ...snapshot.value!, [change.key]: change.value } }
+      listeners.forEach(listener => listener())
+    }
     if (method.endsWith('/login')) running = true
     return { ok: true, value: method.endsWith('/status') ? { active, accounts, login: { running } } : method.endsWith('/logout') ? { revocationConfirmed: false } : null }
   } }
@@ -85,6 +90,17 @@ test('the shipped settings preserve account actions, host React sharing and styl
   try {
     await act(async () => { view = create(createElement(Settings, { rpc, preference, embedded: false })) })
     assert.ok(view)
+    const review = view.root.findAllByType('button').find(button => button.props['aria-label'] === '由 ChatGPT 审批')
+    assert.ok(review)
+    assert.equal(review.props['aria-checked'], false)
+    await act(async () => { await review.props.onClick() })
+    assert.equal(snapshot.value?.codexReview, true)
+    for (const [label, mode] of [['所有模型', 'all'], ['仅 ChatGPT', 'chatgpt'], ['关闭', 'off']]) {
+      const search = view.root.findAllByType('button').find(button => button.props.children === label)
+      assert.ok(search)
+      await act(async () => { await search.props.onClick() })
+      assert.equal(snapshot.value?.searchMode, mode)
+    }
     const button = view.root.findAllByType('button').find(button => button.props['aria-label'] === '使用 ChatGPT 登录')
     assert.ok(button)
     await act(async () => { await button.props.onClick() })

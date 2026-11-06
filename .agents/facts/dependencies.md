@@ -18,6 +18,8 @@
 
 技术决策由 SPEC-001 维护，不在此复制实现进度。
 
+2026-11-07，DSH 0.2.2-rc.1 的 approval/request 答复者可返回单次许可；never 策略在分发前拒绝。WebRuntime 支持正式搜索源注册及来源截断，ready 只检查本地凭据，不应请求模型目录。ConfigEditor 的条目 Fiber 包装对象可能引用不等而 uid 相同。公开模型目录中的专用审查模型可隐藏于普通列表。依据 EVIDENCE-023、EVIDENCE-024，不能据此推断任意宿主版本兼容。
+
 2026-11-07 核对：SIWC 允许模型支持的图片输入但不支持 Files 上传；Responses input_image 接受 data URL。DSH 0.2.2-rc.1 附件服务提供校验后的图片读取，宿主按模型能力执行文字占位，offloaded 表示持久卸载决定。来源与实测限制见 EVIDENCE-020。
 
 依据 EVIDENCE-010：目标公开模型目录提供 supported_reasoning_levels 与 default_reasoning_level；DSH 0.2.2-rc.1 通过精确模型解析的 reasoning 元数据提供档位选择和默认值校验。档位与默认值具有模型差异，不从型号猜测。

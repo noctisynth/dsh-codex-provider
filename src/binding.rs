@@ -181,6 +181,8 @@ pub fn describe_session(record: String) -> napi::Result<AccountInfo> {
 pub struct Model {
     pub id: String,
     pub name: String,
+    pub hidden: Option<bool>,
+    pub auto_review_model_override: Option<String>,
     pub context_window: Option<u32>,
     pub input_modalities: Option<Vec<String>>,
     pub reasoning: Option<ModelReasoning>,
@@ -204,6 +206,8 @@ impl From<models::Model> for Model {
         Self {
             id: value.id,
             name: value.name,
+            hidden: Some(value.hidden),
+            auto_review_model_override: value.auto_review_model_override,
             context_window: value.context_window,
             input_modalities: value.input_modalities,
             reasoning: value.reasoning.map(|reasoning| ModelReasoning {

@@ -26,6 +26,42 @@ fn required<'a>(value: &'a Value, key: &str) -> Result<&'a str, Error> {
         .ok_or(Error::Protocol("OpenAI event omitted a required string"))
 }
 
+fn with_citations(text: &str, content: &Value) -> String {
+    let mut result = text.to_owned();
+    let mut links = Vec::new();
+    if let Some(annotations) = content["annotations"].as_array() {
+        for annotation in annotations {
+            if annotation["type"] != "url_citation" {
+                continue;
+            }
+            let Some(url) = annotation["url"]
+                .as_str()
+                .and_then(|url| reqwest::Url::parse(url).ok())
+            else {
+                continue;
+            };
+            if !matches!(url.scheme(), "http" | "https") || links.contains(&url) {
+                continue;
+            }
+            links.push(url);
+        }
+    }
+    if !links.is_empty() {
+        result.push_str("\n\n");
+        for (index, url) in links.iter().enumerate() {
+            if index > 0 {
+                result.push(' ');
+            }
+            result.push_str(&format!(
+                "[来源 {}](<{}>)",
+                index + 1,
+                url.as_str().replace('>', "%3E").replace('<', "%3C")
+            ));
+        }
+    }
+    result
+}
+
 impl Mapper {
     fn block(
         &mut self,
@@ -129,10 +165,16 @@ impl Mapper {
                             item,
                             out,
                         );
-                        self.close(index, Some(text), out)?;
+                        let visible = if reasoning {
+                            text.to_owned()
+                        } else {
+                            with_citations(text, content)
+                        };
+                        self.close(index, Some(&visible), out)?;
                     }
                 }
             }
+            Some("web_search_call") => {}
             _ => return Err(Error::Protocol("Unsupported OpenAI output item")),
         }
         Ok(())
@@ -232,6 +274,37 @@ impl Mapper {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn server_search_is_replayed_with_clickable_citations_and_no_client_tool_call()
+    -> Result<(), Error> {
+        let mut mapper = Mapper::default();
+        let search = json!({"id":"ws_test","type":"web_search_call","status":"completed","action":{"sources":[{"url":"https://example.com/"}]}});
+        let message = json!({"id":"msg_test","type":"message","role":"assistant","content":[{"type":"output_text","text":"Answer","annotations":[{"type":"url_citation","url":"https://example.com/"}]}]});
+        let mut chunks = mapper
+            .accept(json!({"type":"response.output_item.done","output_index":0,"item":search}))?;
+        chunks.extend(
+            mapper.accept(
+                json!({"type":"response.output_item.done","output_index":1,"item":message}),
+            )?,
+        );
+        chunks
+            .extend(mapper.accept(json!({"type":"response.completed","response":{"output":[]}}))?);
+        assert!(!chunks.iter().any(|chunk| chunk["blockType"] == "tool-call"));
+        let block = chunks
+            .iter()
+            .find(|chunk| chunk["type"] == "block-end")
+            .ok_or(Error::Protocol("Missing text"))?;
+        assert!(
+            block["block"]["text"]
+                .as_str()
+                .is_some_and(|text| text.contains("[来源 1](<https://example.com/>)"))
+        );
+        let finish = chunks.last().ok_or(Error::Protocol("Missing finish"))?;
+        assert_eq!(finish["reason"]["kind"], "stop");
+        assert_eq!(finish["replayState"]["blocks"][0]["items"][0], search);
+        Ok(())
+    }
 
     #[test]
     fn empty_completion_replays_finished_items_before_their_tool_result() -> Result<(), Error> {

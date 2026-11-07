@@ -115,7 +115,7 @@ test('the host UI derives optional avatar fallbacks, keeps credentials private a
   const blocked = await rpc('preference', { key: 'codexReview', value: true })
   assert.ok(!blocked.ok)
   assert.equal(blocked.error.code, 'settings-file-unavailable')
-  assert.match(blocked.error.message, /编辑器/)
+  assert.match(blocked.error.message, /Close it in your editor/)
   assert.doesNotMatch(JSON.stringify(blocked), /synthetic-private-config-path/)
   preferenceFailure = undefined
   try {

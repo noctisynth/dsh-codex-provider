@@ -1,24 +1,26 @@
 export const loginMethods = [
-  { id: 'siwc', label: '继续使用 ChatGPT', description: '使用你的 ChatGPT 套餐。' },
+  { id: 'siwc', label: 'Continue with ChatGPT', description: 'Use your ChatGPT plan.' },
   {
     id: 'codex-browser',
-    label: 'Codex 浏览器（legacy）',
-    description: '在浏览器中完成 Codex 登录。',
+    label: 'Codex browser (legacy)',
+    description: 'Complete Codex sign-in in your browser.',
   },
   {
     id: 'codex-device',
-    label: 'Codex 设备码（legacy）',
-    description: '打开验证页面并输入设备码。',
+    label: 'Codex device code (legacy)',
+    description: 'Open the verification page and enter the device code.',
   },
 ] as const
 
 export function loginMethodLabel(method: string) {
   switch (method) {
     case 'siwc':
-      return 'ChatGPT'
+      return 'SIWC'
     case 'codex-browser':
-      return 'Codex · 浏览器'
+      return 'Codex · Browser (legacy)'
     case 'codex-device':
-      return 'Codex · 设备码'
+      return 'Codex · Device code (legacy)'
+    default:
+      return method
   }
 }

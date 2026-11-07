@@ -14,7 +14,7 @@ function selectedId(payload: unknown): string {
     !('id' in payload) ||
     typeof payload.id !== 'string'
   ) {
-    throw new Error('请选择 ChatGPT 注册。')
+    throw new Error('Choose a ChatGPT account.')
   }
   return payload.id
 }
@@ -58,17 +58,17 @@ export function mountAccountUi(
       case 'status':
         return { ...(await accounts.summary()), login }
       case 'preference': {
-        if (!savePreference) throw new Error('宿主设置暂不可编辑。')
+        if (!savePreference) throw new Error('Host settings cannot be edited right now.')
         await savePreference(payload)
         return null
       }
       case 'login': {
-        if (login.running) throw new Error('ChatGPT 登录正在进行。')
+        if (login.running) throw new Error('ChatGPT sign-in is already in progress.')
         const attemptController = new AbortController()
         controller = attemptController
         const state: LoginState = {
           running: true,
-          notice: '正在准备 ChatGPT 官方登录…',
+          notice: 'Preparing ChatGPT sign-in…',
         }
         login = state
         void ctx.authorization
@@ -87,13 +87,13 @@ export function mountAccountUi(
             },
           })
           .then((outcome) => {
-            if (outcome.status !== 'authorized') state.notice = '已取消登录。'
+            if (outcome.status !== 'authorized') state.notice = 'Sign-in cancelled.'
           })
           .catch((error: unknown) => {
             state.error =
               error instanceof Error && 'code' in error && error.code === 'GenericFailure'
                 ? error.message
-                : 'ChatGPT 登录未完成，请重试。'
+                : 'ChatGPT sign-in did not complete. Please try again.'
           })
           .finally(() => {
             state.running = false
@@ -106,7 +106,7 @@ export function mountAccountUi(
       case 'answer': {
         const id = selectedId(payload)
         if (!pendingPrompt || !login.prompt?.options.some((option) => option.id === id)) {
-          throw new Error('该登录选项已不可用。')
+          throw new Error('This sign-in option is no longer available.')
         }
         pendingPrompt(id)
         return null
@@ -116,7 +116,7 @@ export function mountAccountUi(
         return null
       case 'select':
       case 'logout': {
-        if (login.running) throw new Error('请先完成或取消登录。')
+        if (login.running) throw new Error('Complete or cancel sign-in first.')
         const id = selectedId(payload)
         operations.dispose()
         let outcome: { revocationConfirmed?: boolean; localOnly?: boolean } = {}
@@ -132,7 +132,7 @@ export function mountAccountUi(
         return outcome
       }
       default:
-        throw new Error('未知 ChatGPT 操作。')
+        throw new Error('Unknown ChatGPT operation.')
     }
   }
 
@@ -185,10 +185,10 @@ export function mountAccountUi(
               error: {
                 code: fileError ? 'settings-file-unavailable' : 'chatgpt-operation-failed',
                 message: fileError
-                  ? '无法保存配置文件：请关闭编辑器中打开的 DSH 配置文件后重试；若仍失败，请检查写入权限。'
+                  ? 'Cannot save the configuration file. Close it in your editor and try again. If the problem continues, check write permissions.'
                   : action === 'preference'
-                    ? '设置保存失败，请稍后重试。'
-                    : 'ChatGPT 操作失败，请检查登录状态后重试。',
+                    ? 'Could not save settings. Try again later.'
+                    : 'The ChatGPT operation failed. Check your sign-in and try again.',
                 details: {},
               },
             }

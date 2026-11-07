@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import type { AuthorizationNotice, AuthorizationSession } from '@deepseek-ai/dsh-authorization'
+import {
+  AuthorizationDeclinedError,
+  type AuthorizationNotice,
+  type AuthorizationSession,
+} from '@deepseek-ai/dsh-authorization'
 import type { CredentialProvider, CredentialRecord } from '@deepseek-ai/dsh-credentials'
 import native, { Cancellation, ChatGptClient, createHostId, type LoginAttempt } from '../index.cjs'
 import { Accounts } from '../plugin/accounts.ts'
@@ -13,12 +17,14 @@ test('shared authorization keeps SIWC separate while browser and device replace 
     kind: 'grant',
     payload: { hostId: createHostId(), accounts: [] },
   }
+  let writes = 0
   const credentials = {
     readRecord: async () => record,
     modifyRecord: async (
       _key: unknown,
       mutate: (current: CredentialRecord) => Promise<CredentialRecord | undefined>,
     ) => {
+      writes++
       record = (await mutate(record)) ?? record
       return record
     },
@@ -63,7 +69,7 @@ test('shared authorization keeps SIWC separate while browser and device replace 
       method: 'oauth',
       async commit() {},
       signal: new AbortController().signal,
-      prompt: async (prompt) => (prompt.message === '选择登录方式' ? method : 'add'),
+      prompt: async (prompt) => (prompt.message === 'Choose a sign-in method' ? method : 'add'),
       notify: (notice) => {
         notices.push(notice)
       },
@@ -107,5 +113,49 @@ test('shared authorization keeps SIWC separate while browser and device replace 
     false,
   )
   assert.ok((await accounts.read())?.accounts.includes(siwc))
+  const beforeBack = JSON.stringify(record)
+  const writesBeforeBack = writes
+  const openedBeforeBack = opened.length
+  client.beginLogin = async () => assert.fail('Returning must not start native sign-in')
+  let prompts = 0
+  await assert.rejects(
+    accounts.authorize({
+      method: 'oauth',
+      signal: new AbortController().signal,
+      async commit() {},
+      notify() {},
+      async prompt(request) {
+        assert.equal(request.kind, 'select')
+        prompts++
+        if (prompts === 1) return 'add'
+        if (prompts === 2) {
+          assert.ok(request.options.some((option) => option.id === 'back'))
+          return 'back'
+        }
+        assert.equal(request.message, 'Choose an account')
+        throw new AuthorizationDeclinedError()
+      },
+    }),
+    AuthorizationDeclinedError,
+  )
+  assert.equal(prompts, 3)
+  assert.equal(JSON.stringify(record), beforeBack)
+  assert.equal(writes, writesBeforeBack)
+  assert.equal(opened.length, openedBeforeBack)
+  record = { kind: 'grant', payload: { hostId: createHostId(), accounts: [] } }
+  const empty = JSON.stringify(record)
+  await assert.rejects(
+    accounts.authorize({
+      method: 'oauth',
+      signal: new AbortController().signal,
+      async commit() {},
+      notify() {},
+      prompt: async () => 'back',
+    }),
+    AuthorizationDeclinedError,
+  )
+  assert.equal(JSON.stringify(record), empty)
+  assert.equal(writes, writesBeforeBack)
+  assert.equal(opened.length, openedBeforeBack)
   operations.dispose()
 })

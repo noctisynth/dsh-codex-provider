@@ -147,7 +147,7 @@ test('host approval uses independent ChatGPT routing, exact pending context and 
     ptc.events.push({ seq: 3, type: 'tool/ptc-dispatch', data: { subCallId: 'pending' } })
     await assert.rejects(
       reviewContext(ctx, ptc.request as never, new AbortController().signal),
-      /已经完成/,
+      /already completed/,
     )
     await review.dispose()
     answer = '{"risk":"low","decision":"allow"}'
@@ -262,12 +262,12 @@ test('search modes isolate auxiliary requests and shared search preserves comple
     searched = false
     await assert.rejects(
       search.search({ query: 'synthetic search' }, new AbortController().signal),
-      /未执行/,
+      /did not perform/,
     )
     mode = 'off'
     await assert.rejects(
       search.search({ query: 'synthetic search' }, new AbortController().signal),
-      /未开启/,
+      /is off/,
     )
   } finally {
     operations.dispose()

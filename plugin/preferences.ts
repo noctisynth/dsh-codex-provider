@@ -27,7 +27,7 @@ export class Preferences {
           ? entry.options.name === name || entry.options.name === `cordis:${name}`
           : entry.fiber?.uid === this.owner.uid,
       )
-    if (!entry?.options.id) throw new Error('找不到可编辑的宿主配置。')
+    if (!entry?.options.id) throw new Error('No editable host configuration was found.')
     return entry.options.id
   }
 
@@ -107,7 +107,7 @@ type PreferenceChange =
 
 function parsePreference(payload: unknown): PreferenceChange {
   if (!payload || typeof payload !== 'object' || !('key' in payload) || !('value' in payload))
-    throw new Error('设置参数无效。')
+    throw new Error('Invalid settings parameters.')
   const { key, value } = payload
   switch (key) {
     case 'sidebarAccount':
@@ -120,5 +120,5 @@ function parsePreference(payload: unknown): PreferenceChange {
       if (value === 'off' || value === 'chatgpt' || value === 'all') return { key, value }
       break
   }
-  throw new Error('设置值无效。')
+  throw new Error('Invalid setting value.')
 }

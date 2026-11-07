@@ -1,5 +1,6 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { ClientConnectionRpc } from '@deepseek-ai/dsh-client-connection/client'
+import type { Translate } from '@deepseek-ai/dsh-client-locale/client'
 import type {
   ConfigForm,
   SettingsLauncherOwnerProps,
@@ -10,6 +11,7 @@ import type { AccountStatus } from '../shared/account-ui.ts'
 import type { SidebarPreference } from '../shared/sidebar-preference.ts'
 import { AccountAvatar } from './account-avatar.tsx'
 import { cn } from './lib/utils.ts'
+import { localeNamespace } from './locales/index.ts'
 import { LogoutConfirmation } from './logout-confirmation.tsx'
 import { OpenAiLogo } from './openai-logo.tsx'
 import { setPreference } from './preferences.ts'
@@ -28,7 +30,12 @@ export function ChatGptLauncher({
   wide,
   openSettings,
   settingsShortcut,
-}: SettingsLauncherOwnerProps & { rpc: ClientConnectionRpc; form: ConfigForm<SidebarPreference> }) {
+  t,
+}: SettingsLauncherOwnerProps & {
+  rpc: ClientConnectionRpc
+  form: ConfigForm<SidebarPreference>
+  t: Translate
+}) {
   const { status, busy, error, act } = useAccountSettings(rpc)
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -48,7 +55,9 @@ export function ChatGptLauncher({
       await setPreference(rpc, 'sidebarAccount', 'deepseek')
     } catch (cause) {
       setPreferenceError(
-        cause instanceof Error ? cause.message : '未能保存侧边栏显示设置，请重试。',
+        cause instanceof Error
+          ? cause.message
+          : 'Could not save the sidebar preference. Please try again.',
       )
     } finally {
       setSaving(false)
@@ -59,11 +68,14 @@ export function ChatGptLauncher({
       <DropdownMenu open={open} onOpenChange={setOpen}>
         <DropdownMenuTrigger
           ref={trigger}
-          aria-label={`${label}，账号菜单`}
+          aria-label={t('{name}, account menu', { name: label })}
           title={wide ? undefined : `${label} · ChatGPT`}
           className={cn(
             buttonVariants({ variant: 'ghost' }),
-            `cp:box-border cp:min-w-0 cp:rounded-[var(--dsw-radius-md)] cp:text-foreground ${wide ? 'cp:mx-0.5 cp:h-11 cp:w-[calc(100%-4px)] cp:justify-start cp:gap-2 cp:p-1.5 cp:has-[>svg]:px-1.5' : 'cp:mx-auto cp:size-9 cp:justify-center cp:gap-0 cp:p-0 cp:has-[>svg]:px-0'}`,
+            'cp:box-border cp:min-w-0 cp:rounded-[var(--dsw-radius-md)] cp:text-foreground',
+            wide
+              ? 'cp:mx-0.5 cp:h-11 cp:w-[calc(100%-4px)] cp:justify-start cp:gap-2 cp:p-1.5 cp:has-[>svg]:px-1.5'
+              : 'cp:mx-auto cp:size-9 cp:justify-center cp:gap-0 cp:p-0 cp:has-[>svg]:px-0',
           )}
         >
           {account ? (
@@ -83,7 +95,11 @@ export function ChatGptLauncher({
                 {label}
               </span>
               <span className='cp:block cp:truncate cp:text-xs cp:leading-4 cp:font-normal cp:text-muted-foreground'>
-                {account ? 'ChatGPT' : status ? '前往设置登录' : '正在读取账号'}
+                {account
+                  ? 'ChatGPT'
+                  : status
+                    ? t('Open settings to sign in')
+                    : t('Loading accounts')}
               </span>
             </span>
           )}
@@ -106,7 +122,7 @@ export function ChatGptLauncher({
             }}
           >
             <Settings aria-hidden='true' />
-            设置
+            {t('Settings')}
             {settingsShortcut && (
               <span className='cp:ml-auto cp:pl-4 cp:text-xs cp:text-muted-foreground'>
                 {settingsShortcut.keys.join(' ')}
@@ -121,7 +137,7 @@ export function ChatGptLauncher({
             }}
           >
             <ArrowLeftRight aria-hidden='true' />
-            显示 DeepSeek 账号
+            {t('Show DeepSeek account')}
           </DropdownMenuItem>
           {account && (
             <>
@@ -134,7 +150,7 @@ export function ChatGptLauncher({
                 }}
               >
                 <LogOut aria-hidden='true' />
-                退出登录
+                {t('Sign out')}
               </DropdownMenuItem>
             </>
           )}
@@ -143,13 +159,14 @@ export function ChatGptLauncher({
               role='alert'
               className='cp:mx-2.5 cp:my-2 cp:max-w-56 cp:text-xs cp:leading-relaxed cp:text-destructive'
             >
-              {failure}
+              {t(failure)}
             </p>
           )}
         </DropdownMenuContent>
       </DropdownMenu>
       {logout && (
         <LogoutConfirmation
+          t={t}
           account={logout}
           close={() => setLogout(null)}
           confirm={() => {
@@ -174,7 +191,12 @@ export function mountSidebarAccount(
     const sync = () => {
       if (form.getSnapshot().value?.sidebarAccount === 'chatgpt') {
         dispose ??= ctx.slots.register(
-          { name: 'settings.launcher', priority: -1, inject: () => ({ rpc, form }) },
+          {
+            name: 'settings.launcher',
+            locale: localeNamespace,
+            priority: -1,
+            inject: () => ({ rpc, form }),
+          },
           ChatGptLauncher,
         )
       } else {

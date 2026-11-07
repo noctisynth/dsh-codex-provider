@@ -1,4 +1,13 @@
-import { ArrowRight, KeyRound, LoaderCircle, Monitor, Plus, RotateCw } from 'lucide-react'
+import type { Translate } from '@deepseek-ai/dsh-client-locale/client'
+import {
+  ArrowLeft,
+  ArrowRight,
+  KeyRound,
+  LoaderCircle,
+  Monitor,
+  Plus,
+  RotateCw,
+} from 'lucide-react'
 import type { AccountStatus, LoginState } from '../shared/account-ui.ts'
 import { loginMethodLabel } from '../shared/login-methods.ts'
 import { AccountAvatar } from './account-avatar.tsx'
@@ -11,30 +20,37 @@ export function LoginPanel({
   busy,
   answer,
   cancel,
+  t,
 }: {
   login: LoginState
   accounts: AccountStatus['accounts']
   busy: boolean
   answer(id: string): void
   cancel(): void
+  t: Translate
 }) {
   const prompt = login.prompt
   const add = prompt?.options.find((option) => option.id === 'add')
-  const choices = prompt?.options.filter((option) => option.id !== 'add' && option.id !== 'cancel')
-  const title = add
-    ? '连接 ChatGPT'
-    : (prompt?.message ?? (login.device ? '输入设备码' : '在浏览器中继续'))
-  const description = add
-    ? '重新登录已有账号，或添加新账号。'
-    : prompt
-      ? undefined
-      : login.device
-        ? '打开验证页面，输入以下验证码。'
-        : '完成登录后，这里会自动更新。'
+  const back = prompt?.options.find((option) => option.id === 'back')
+  const choices = prompt?.options.filter((option) => !['add', 'cancel', 'back'].includes(option.id))
+  let title: string
+  let description: string | undefined
+  if (add) {
+    title = t('Connect ChatGPT')
+    description = t('Sign in again with a saved account, or add a new account.')
+  } else if (prompt) {
+    title = t(prompt.message)
+  } else if (login.device) {
+    title = t('Enter the device code')
+    description = t('Open the verification page and enter the following code.')
+  } else {
+    title = t('Continue in your browser')
+    description = t('This page will update automatically after you sign in.')
+  }
 
   return (
     <section
-      aria-label='ChatGPT 登录'
+      aria-label={t('ChatGPT sign-in')}
       className='cp:mt-5 cp:overflow-hidden cp:rounded-xl cp:border cp:border-solid cp:border-border'
     >
       <div role='status' className='cp:flex cp:items-start cp:gap-3 cp:px-4 cp:pt-4 cp:pb-3'>
@@ -64,13 +80,15 @@ export function LoginPanel({
                   ? KeyRound
                   : RotateCw
             const label = account
-              ? `重新登录 ${account.name || account.email || '此账号'}`
-              : option.label
+              ? t('Sign in again as {name}', {
+                  name: account.name || account.email || t('this account'),
+                })
+              : t(option.label)
             const detail = account
-              ? [account.name && account.email, loginMethodLabel(account.loginMethod)]
+              ? [account.name && account.email, t(loginMethodLabel(account.loginMethod))]
                   .filter(Boolean)
                   .join(' · ')
-              : option.description
+              : option.description && t(option.description)
             return (
               <Button
                 key={option.id}
@@ -119,11 +137,23 @@ export function LoginPanel({
             rel='noreferrer'
             className='cp:text-xs cp:text-foreground cp:underline cp:underline-offset-4'
           >
-            打开验证页面
+            {t('Open verification page')}
           </a>
         </div>
       )}
       <div className='cp:flex cp:items-center cp:justify-end cp:gap-3 cp:border-0 cp:border-t cp:border-solid cp:border-border cp:bg-muted/20 cp:px-4 cp:py-3'>
+        {back && (
+          <Button
+            size='sm'
+            variant='ghost'
+            className='cp:mr-auto'
+            disabled={busy}
+            onClick={() => answer(back.id)}
+          >
+            <ArrowLeft aria-hidden='true' />
+            {t('Back')}
+          </Button>
+        )}
         {add && (
           <Button
             size='sm'
@@ -133,11 +163,11 @@ export function LoginPanel({
             onClick={() => answer(add.id)}
           >
             <Plus aria-hidden='true' />
-            添加新账号
+            {t('Add new account')}
           </Button>
         )}
         <Button size='sm' variant='outline' disabled={busy} onClick={cancel}>
-          取消登录
+          {t('Cancel sign-in')}
         </Button>
       </div>
     </section>

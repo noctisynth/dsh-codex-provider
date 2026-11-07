@@ -110,7 +110,8 @@ export class ChatGptAdapter extends LlmAdapter {
       models.find((model) => model.id === parentModel)?.autoReviewModelOverride ??
       'codex-auto-review'
     const selected = models.find((model) => model.id === id)
-    if (!selected) throw new Error('当前 ChatGPT 账号未提供自动审查模型，请检查登录状态。')
+    if (!selected)
+      throw new Error('This ChatGPT account has no automatic review model. Check your sign-in.')
     return selected
   }
 
@@ -121,7 +122,7 @@ export class ChatGptAdapter extends LlmAdapter {
 
   async *search(query: string, signal?: AbortSignal): AsyncIterable<StreamChunk> {
     const model = (await this.listModels())[0]
-    if (!model) throw new Error('请先登录 ChatGPT 后再使用搜索。')
+    if (!model) throw new Error('Sign in to ChatGPT before using search.')
     yield* this.request(
       {
         provider,

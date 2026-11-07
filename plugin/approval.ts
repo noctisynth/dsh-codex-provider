@@ -51,10 +51,10 @@ export function mountApproval(ctx: Context, adapter: ChatGptAdapter, enabled: ()
           signal,
           ...(effort ? { reasoningEffort: ReasoningEffortId(effort) } : {}),
         })) {
-          if (finished) throw new Error('审查流已结束。')
+          if (finished) throw new Error('The review stream has ended.')
           result.push(chunk)
           if (chunk.type === 'finish') {
-            if (chunk.reason.kind !== 'stop') throw new Error('ChatGPT 审查未完成。')
+            if (chunk.reason.kind !== 'stop') throw new Error('ChatGPT review did not complete.')
             finished = true
           }
         }
@@ -65,7 +65,7 @@ export function mountApproval(ctx: Context, adapter: ChatGptAdapter, enabled: ()
           text?.type !== 'text' ||
           blocks.slice(0, -1).some((block) => block.type !== 'reasoning')
         )
-          throw new Error('审查结果格式无效。')
+          throw new Error('Invalid review result format.')
         if (signal.aborted || !enabled()) return 'cancelled'
         return native.parseReviewDecision(text.text) ? 'allowed-once' : 'rejected'
       } catch {

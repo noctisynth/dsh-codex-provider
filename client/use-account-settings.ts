@@ -38,7 +38,7 @@ export function useAccountSettings(rpc: ClientConnectionRpc) {
         if (value.login.running) timer = setTimeout(load, 700)
       } catch (error) {
         if (!lifetime.signal.aborted)
-          setError(error instanceof Error ? error.message : '无法读取账号状态。')
+          setError(error instanceof Error ? error.message : 'Could not load accounts.')
       }
     }
     void load()
@@ -89,15 +89,15 @@ export function useAccountSettings(rpc: ClientConnectionRpc) {
       if (action === 'login') ownedLogin.current = true
       if (action === 'logout') {
         const logout = value as AccountActions['logout']
-        if (logout.revocationConfirmed || logout.localOnly) setNotice('已退出登录')
+        if (logout.revocationConfirmed || logout.localOnly) setNotice('Signed out.')
         else {
-          setError('本地凭据已清除，未能确认远端授权撤销。')
+          setError('Local credentials were cleared, but remote revocation could not be confirmed.')
           return false
         }
       }
       return true
     } catch (error) {
-      setError(error instanceof Error ? error.message : '操作失败，请重试。')
+      setError(error instanceof Error ? error.message : 'The operation failed. Please try again.')
       return false
     } finally {
       setBusy(false)

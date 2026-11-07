@@ -41,7 +41,7 @@ export function apply(ctx: Context, config: Config): void {
     ctx.authorization.registerFlow({
       key: accountsKey,
       label: 'ChatGPT',
-      methods: [{ id: 'oauth', label: '使用 ChatGPT 官方账号登录' }],
+      methods: [{ id: 'oauth', label: 'Sign in with your ChatGPT account' }],
       run: (session) => accounts.authorize(session),
     }),
   )
@@ -56,7 +56,7 @@ export function apply(ctx: Context, config: Config): void {
     mountApproval(child, adapter, () => config.codexReview.get())
   })
   let savePreference = async (_payload: unknown): Promise<void> => {
-    throw new Error('宿主设置尚未就绪。')
+    throw new Error('Host settings are not ready.')
   }
   ctx.inject(['settings', 'configEditor'], (child) => {
     const preferences = new Preferences(child, ctx.fiber, config.previousSearchProvider)

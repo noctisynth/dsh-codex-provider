@@ -5,6 +5,7 @@ import { test } from 'node:test'
 import { runInNewContext } from 'node:vm'
 import { clientRequestSchema } from '@deepseek-ai/dsh-client-connection'
 import type { ClientConnectionRpc } from '@deepseek-ai/dsh-client-connection/client'
+import type { Translate } from '@deepseek-ai/dsh-client-locale/client'
 import type {
   ConfigForm,
   ConfigFormSnapshot,
@@ -14,6 +15,7 @@ import { type ComponentType, createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import type { AccountStatus } from '../shared/account-ui.ts'
 import type { SidebarPreference } from '../shared/sidebar-preference.ts'
+import { localeFixture } from './locale-fixture.mts'
 
 test('the shipped settings preserve account actions, host React sharing and stylesheet disposal', async () => {
   let loaded:
@@ -76,7 +78,10 @@ test('the shipped settings preserve account actions, host React sharing and styl
     )
     return hostRequire(name)
   }) as NodeRequire)
-  const slots: { name: string; id?: string; key?: string; priority?: number }[] = []
+  const locale = await localeFixture('zh')
+  const t = locale.bind('codex-provider')
+  const slots: { name: string; id?: string; key?: string; priority?: number; locale?: string }[] =
+    []
   const requests: { method: string; payload: unknown }[] = []
   let running = false
   let active: string | undefined
@@ -140,14 +145,17 @@ test('the shipped settings preserve account actions, host React sharing and styl
     rpc: ClientConnectionRpc
     preference: ConfigForm<SidebarPreference>
     embedded: boolean
+    t: Translate
   }
   type LauncherProps = SettingsLauncherOwnerProps & {
     rpc: ClientConnectionRpc
     form: ConfigForm<SidebarPreference>
+    t: Translate
   }
   let component: ComponentType<SettingsProps> | undefined
   let launcher: ComponentType<LauncherProps> | undefined
   plugin.apply({
+    locale,
     effect: (mount: () => () => void) => {
       disposers.push(mount())
     },
@@ -196,7 +204,7 @@ test('the shipped settings preserve account actions, host React sharing and styl
   let view: ReactTestRenderer | undefined
   try {
     await act(async () => {
-      view = create(createElement(Settings, { rpc, preference, embedded: false }))
+      view = create(createElement(Settings, { rpc, preference, t, embedded: false }))
     })
     assert.ok(view)
     const review = view.root
@@ -254,7 +262,7 @@ test('the shipped settings preserve account actions, host React sharing and styl
   ]
   try {
     await act(async () => {
-      view = create(createElement(Settings, { rpc, preference, embedded: true }), {
+      view = create(createElement(Settings, { rpc, preference, t, embedded: true }), {
         createNodeMock: (element) =>
           element.type === 'dialog' ? { showModal() {}, close() {} } : null,
       })
@@ -348,7 +356,7 @@ test('the shipped settings preserve account actions, host React sharing and styl
   active = accounts[0].id
   try {
     await act(async () => {
-      view = create(createElement(Settings, { rpc, preference, embedded: false }), {
+      view = create(createElement(Settings, { rpc, preference, t, embedded: false }), {
         createNodeMock: (element) =>
           element.type === 'dialog' ? { showModal() {}, close() {} } : null,
       })
@@ -365,6 +373,7 @@ test('the shipped settings preserve account actions, host React sharing and styl
     const Launcher = launcher
     let opened = 0
     const owner: LauncherProps = {
+      t,
       rpc,
       form: preference,
       wide: true,

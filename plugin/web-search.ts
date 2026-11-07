@@ -11,7 +11,8 @@ export function chatGptSearch(adapter: ChatGptAdapter, enabled: () => boolean): 
     available: enabled,
     ready: () => adapter.hasCredentials(),
     async search(request, signal) {
-      if (!enabled()) throw new WebError('ChatGPT 共享搜索未开启。', 'WEB_PROVIDER_UNAVAILABLE')
+      if (!enabled())
+        throw new WebError('ChatGPT shared search is off.', 'WEB_PROVIDER_UNAVAILABLE')
       const result = new BlockAssembler()
       let replay: unknown
       let finished = false
@@ -19,12 +20,12 @@ export function chatGptSearch(adapter: ChatGptAdapter, enabled: () => boolean): 
         result.push(chunk)
         if (chunk.type === 'finish') {
           if (chunk.reason.kind !== 'stop')
-            throw new WebError('ChatGPT 搜索未完成。', 'WEB_PROVIDER_ERROR')
+            throw new WebError('ChatGPT search did not complete.', 'WEB_PROVIDER_ERROR')
           replay = chunk.replayState
           finished = true
         }
       }
-      if (!finished) throw new WebError('ChatGPT 搜索意外中断。', 'WEB_PROVIDER_ERROR')
+      if (!finished) throw new WebError('ChatGPT search was interrupted.', 'WEB_PROVIDER_ERROR')
       const state = replay as
         | { blocks?: { items?: OutputItem[] }[]; response?: { trailing?: OutputItem[] } }
         | undefined
@@ -59,7 +60,11 @@ export function chatGptSearch(adapter: ChatGptAdapter, enabled: () => boolean): 
             if (annotation.type === 'url_citation') add(annotation)
           }
       }
-      if (!searched) throw new WebError('ChatGPT 未执行请求的网页搜索。', 'WEB_PROVIDER_ERROR')
+      if (!searched)
+        throw new WebError(
+          'ChatGPT did not perform the requested web search.',
+          'WEB_PROVIDER_ERROR',
+        )
       return {
         content: result
           .blocks()

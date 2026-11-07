@@ -1,5 +1,8 @@
 import { createHash } from 'node:crypto'
-import type { AuthorizationSession } from '@deepseek-ai/dsh-authorization'
+import {
+  AuthorizationDeclinedError,
+  type AuthorizationSession,
+} from '@deepseek-ai/dsh-authorization'
 import type { CredentialProvider, CredentialRecord } from '@deepseek-ai/dsh-credentials'
 import { credentialKey } from '@deepseek-ai/dsh-credentials'
 import { LlmError } from '@deepseek-ai/dsh-llm'
@@ -17,14 +20,47 @@ interface Vault {
 
 function vaultOf(record: CredentialRecord | undefined): Vault | undefined {
   if (!record) return undefined
-  if (record.kind !== 'grant') throw new LlmError('ChatGPT 凭据记录类型无效。', 'AUTH')
+  if (record.kind !== 'grant') throw new LlmError('Invalid ChatGPT credential record type.', 'AUTH')
   return record.payload as Vault
 }
 
 function requiredVault(record: CredentialRecord | undefined): Vault {
   const vault = vaultOf(record)
-  if (!vault) throw new LlmError('请先在设置 → ChatGPT 中登录。', 'AUTH')
+  if (!vault) throw new LlmError('Sign in from Settings → ChatGPT first.', 'AUTH')
   return vault
+}
+
+async function chooseLogin(session: AuthorizationSession, vault: Pick<Vault, 'accounts'>) {
+  for (;;) {
+    let previous: string | undefined
+    if (vault.accounts.length) {
+      const choice = await session.prompt({
+        kind: 'select',
+        message: 'Choose an account',
+        options: [
+          ...vault.accounts.map((record) => {
+            const account = native.describeSession(record)
+            return {
+              id: account.id,
+              label: account.email ?? 'ChatGPT account',
+              description: loginMethodLabel(account.loginMethod),
+            }
+          }),
+          { id: 'add', label: 'Add ChatGPT account' },
+        ],
+      })
+      if (choice !== 'add')
+        previous = vault.accounts.find((record) => native.describeSession(record).id === choice)
+    }
+    if (previous) return { previous, method: native.describeSession(previous).loginMethod }
+    const method = await session.prompt({
+      kind: 'select',
+      message: 'Choose a sign-in method',
+      options: [...loginMethods, { id: 'back', label: 'Back' }],
+    })
+    if (method !== 'back') return { previous: undefined, method }
+    if (!vault.accounts.length) throw new AuthorizationDeclinedError()
+  }
 }
 
 export const accountsKey = credentialKey('codex-provider', 'accounts')
@@ -81,7 +117,7 @@ export class Accounts {
     await this.credentials.modifyRecord(accountsKey, async (current) => {
       const vault = requiredVault(current)
       if (!vault?.accounts.some((record) => native.describeSession(record).id === id)) {
-        throw new LlmError('未找到该 ChatGPT 注册。', 'AUTH')
+        throw new LlmError('ChatGPT account not found.', 'AUTH')
       }
       return { kind: 'grant', payload: { ...vault, active: id } }
     })
@@ -92,7 +128,7 @@ export class Accounts {
     await this.credentials.modifyRecord(accountsKey, async (current) => {
       const vault = requiredVault(current)
       const index = vault.accounts.findIndex((record) => native.describeSession(record).id === id)
-      if (index < 0) throw new LlmError('未找到该 ChatGPT 注册。', 'AUTH')
+      if (index < 0) throw new LlmError('ChatGPT account not found.', 'AUTH')
       const result = await this.client.logoutSession(vault.accounts[index], cancellation)
       outcome = { revocationConfirmed: result.revocationConfirmed, localOnly: result.localOnly }
       const accounts = [...vault.accounts]
@@ -111,7 +147,7 @@ export class Accounts {
         (record) => native.describeSession(record).id === vault.active,
       )
       if (!record || !native.describeSession(record).hasCredentials) {
-        throw new LlmError('请先在设置 → ChatGPT 中登录。', 'AUTH')
+        throw new LlmError('Sign in from Settings → ChatGPT first.', 'AUTH')
       }
       const renewed = await this.client.renewSession(record, cancellation)
       selected = renewed.record
@@ -128,7 +164,7 @@ export class Accounts {
     // A terminal refresh failure must commit its cleared tokens before reporting failure.
     if (signedOut)
       throw new LlmError(
-        'ChatGPT 登录已失效，请在设置 → ChatGPT 中重新登录。',
+        'Your ChatGPT sign-in has expired. Sign in again from Settings → ChatGPT.',
         'INVALID_CREDENTIAL',
       )
     return selected
@@ -138,6 +174,10 @@ export class Accounts {
     const operation = this.operations.start(session.signal)
     let attempt: LoginAttempt | undefined
     try {
+      const available = await this.read()
+      const { previous, method } = await chooseLogin(session, {
+        accounts: available?.accounts ?? [],
+      })
       // Persist the stable host identity before constructing the first OAuth URL.
       const initialized = await this.credentials.modifyRecord(accountsKey, async (current) => {
         session.signal.throwIfAborted()
@@ -146,29 +186,6 @@ export class Accounts {
         )
       })
       const vault = requiredVault(initialized)
-      let previous: string | undefined
-      if (vault.accounts.length) {
-        const choice = await session.prompt({
-          kind: 'select',
-          message: '选择账号',
-          options: [
-            ...vault.accounts.map((record) => {
-              const account = native.describeSession(record)
-              return {
-                id: account.id,
-                label: account.email ?? 'ChatGPT 账号',
-                description: loginMethodLabel(account.loginMethod),
-              }
-            }),
-            { id: 'add', label: '添加 ChatGPT 账号' },
-          ],
-        })
-        if (choice !== 'add')
-          previous = vault.accounts.find((record) => native.describeSession(record).id === choice)
-      }
-      const method = previous
-        ? native.describeSession(previous).loginMethod
-        : await session.prompt({ kind: 'select', message: '选择登录方式', options: loginMethods })
       attempt = await this.client.beginLogin(vault.hostId, previous, operation.cancellation, method)
       let result: LoginResult
       for (;;) {
@@ -176,11 +193,11 @@ export class Accounts {
         session.notify(
           attempt.userCode
             ? {
-                message: '请打开验证页面，输入下方设备码完成登录。',
+                message: 'Open the verification page and enter the code below to sign in.',
                 url: attempt.authorizationUrl,
                 code: attempt.userCode,
               }
-            : { message: '请在系统浏览器中完成 ChatGPT 登录。' },
+            : { message: 'Complete ChatGPT sign-in in your system browser.' },
         )
         await this.openBrowser(attempt.authorizationUrl)
         try {
@@ -190,10 +207,10 @@ export class Accounts {
           if (!attempt.canRetry) throw error
           const answer = await session.prompt({
             kind: 'select',
-            message: '授权码已失效，是否重新登录？',
+            message: 'The authorization code expired. Sign in again?',
             options: [
-              { id: 'retry', label: '重新登录' },
-              { id: 'cancel', label: '取消' },
+              { id: 'retry', label: 'Sign in again' },
+              { id: 'cancel', label: 'Cancel' },
             ],
           })
           if (answer !== 'retry') throw error
@@ -211,8 +228,8 @@ export class Accounts {
       })
       session.notify({
         message: result.account.planUsageAuthorized
-          ? 'ChatGPT 登录完成。'
-          : '登录完成，但未授予 ChatGPT 订阅用量权限，暂时无法调用模型。',
+          ? 'ChatGPT sign-in completed.'
+          : 'Signed in without permission to use your ChatGPT plan. Model requests are unavailable.',
       })
     } finally {
       attempt?.cancel()

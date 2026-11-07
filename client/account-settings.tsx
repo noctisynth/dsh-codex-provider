@@ -1,4 +1,5 @@
 import type { ClientConnectionRpc } from '@deepseek-ai/dsh-client-connection/client'
+import type { Translate } from '@deepseek-ai/dsh-client-locale/client'
 import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { ArrowRight, Check, Plus } from 'lucide-react'
 import { useState } from 'react'
@@ -7,6 +8,7 @@ import { loginMethodLabel } from '../shared/login-methods.ts'
 import type { SidebarPreference } from '../shared/sidebar-preference.ts'
 import { AccountAvatar } from './account-avatar.tsx'
 import { FeatureSettings } from './feature-settings.tsx'
+import { cn } from './lib/utils.ts'
 import { LoginPanel } from './login-panel.tsx'
 import { LogoutConfirmation } from './logout-confirmation.tsx'
 import { OpenAiLogo } from './openai-logo.tsx'
@@ -16,14 +18,22 @@ import { useAccountSettings } from './use-account-settings.ts'
 
 type Account = AccountStatus['accounts'][number]
 
+function accountDescription(account: Account, t: Translate) {
+  if (!account.hasCredentials) return t('Signed out · Sign in again to continue')
+  if (!account.planUsageAuthorized) return t('Model access not granted')
+  return account.name && account.email ? account.email : t('Connected')
+}
+
 export function AccountSettings({
   rpc,
   preference,
   embedded,
+  t,
 }: {
   rpc: ClientConnectionRpc
   preference: ConfigForm<SidebarPreference>
   embedded: boolean
+  t: Translate
 }) {
   const { status, busy, notice, error, act } = useAccountSettings(rpc)
   const [logout, setLogout] = useState<Account | null>(null)
@@ -33,9 +43,12 @@ export function AccountSettings({
   return (
     <section
       data-codex-provider=''
-      aria-label='ChatGPT 账号设置'
+      aria-label={t('ChatGPT accounts')}
       aria-busy={!status || busy}
-      className={`cp:box-border cp:[&_*]:box-border cp:w-full cp:max-w-3xl cp:text-sm cp:leading-relaxed cp:text-foreground cp:[&_button]:font-[inherit] ${embedded ? 'cp:py-2' : 'cp:py-4'}`}
+      className={cn(
+        'cp:box-border cp:[&_*]:box-border cp:w-full cp:max-w-3xl cp:text-sm cp:leading-relaxed cp:text-foreground cp:[&_button]:font-[inherit]',
+        embedded ? 'cp:py-2' : 'cp:py-4',
+      )}
     >
       <header className='cp:mb-7 cp:flex cp:flex-wrap cp:items-center cp:justify-between cp:gap-3'>
         <div className='cp:flex cp:items-center cp:gap-3'>
@@ -45,7 +58,7 @@ export function AccountSettings({
           <div>
             <h2 className='cp:m-0 cp:text-lg cp:font-semibold cp:tracking-tight'>ChatGPT</h2>
             <p className='cp:mt-1 cp:mb-0 cp:text-sm cp:text-muted-foreground'>
-              管理用于 Codex 模型的账号。
+              {t('Manage accounts for Codex models.')}
             </p>
           </div>
         </div>
@@ -56,28 +69,30 @@ export function AccountSettings({
           onClick={() => act('login')}
         >
           <Plus aria-hidden='true' />
-          添加账号
+          {t('Add account')}
         </Button>
       </header>
       {!status && (
-        <div role='status' className='cp:space-y-3 cp:py-5' aria-label='正在读取账号'>
+        <div role='status' className='cp:space-y-3 cp:py-5' aria-label={t('Loading accounts')}>
           <Skeleton className='cp:h-4 cp:w-40' />
           <Skeleton className='cp:h-3 cp:w-56 cp:max-w-full' />
         </div>
       )}
       {status && accounts.length === 0 && !running && (
         <div className='cp:rounded-xl cp:bg-muted/50 cp:px-6 cp:py-8'>
-          <h3 className='cp:m-0 cp:text-base cp:font-medium'>连接你的 ChatGPT 账号</h3>
+          <h3 className='cp:m-0 cp:text-base cp:font-medium'>
+            {t('Connect your ChatGPT account')}
+          </h3>
           <p className='cp:mt-2 cp:mb-5 cp:text-muted-foreground'>
-            在浏览器中完成授权，即可在对话中使用 Codex。
+            {t('Complete sign-in in your browser to use Codex in conversations.')}
           </p>
           <Button
             size='sm'
-            aria-label='使用 ChatGPT 登录'
+            aria-label={t('Sign in with ChatGPT')}
             disabled={busy}
             onClick={() => act('login')}
           >
-            使用 ChatGPT 登录
+            {t('Sign in with ChatGPT')}
             <ArrowRight aria-hidden='true' />
           </Button>
         </div>
@@ -98,28 +113,22 @@ export function AccountSettings({
               <div className='cp:min-w-0 cp:flex-1 cp:basis-40'>
                 <div className='cp:flex cp:flex-wrap cp:items-center cp:gap-2'>
                   <span className='cp:break-all cp:font-medium'>
-                    {account.name || account.email || 'ChatGPT 账号'}
+                    {account.name || account.email || t('ChatGPT account')}
                   </span>
                   <span className='cp:shrink-0 cp:rounded-md cp:bg-muted cp:px-1.5 cp:py-0.5 cp:text-[10px] cp:leading-4 cp:font-normal cp:text-muted-foreground'>
-                    {loginMethodLabel(account.loginMethod)}
+                    {t(loginMethodLabel(account.loginMethod))}
                   </span>
                   {account.hasCredentials &&
                     account.planUsageAuthorized &&
                     status?.active === account.id && (
                       <Check
-                        aria-label='当前使用'
+                        aria-label={t('Currently selected')}
                         className='cp:size-3 cp:shrink-0 cp:text-muted-foreground'
                       />
                     )}
                 </div>
                 <div className='cp:mt-1 cp:flex cp:items-center cp:gap-1.5 cp:text-xs cp:text-muted-foreground'>
-                  {!account.hasCredentials
-                    ? '已退出 · 重新登录后可用'
-                    : !account.planUsageAuthorized
-                      ? '未授权模型使用权限'
-                      : account.name && account.email
-                        ? account.email
-                        : '已连接'}
+                  {accountDescription(account, t)}
                 </div>
               </div>
               <div className='cp:flex cp:items-center cp:gap-2'>
@@ -130,7 +139,7 @@ export function AccountSettings({
                     disabled={busy || running}
                     onClick={() => act('login')}
                   >
-                    重新登录
+                    {t('Sign in again')}
                   </Button>
                 ) : (
                   <>
@@ -141,7 +150,7 @@ export function AccountSettings({
                         disabled={busy || running}
                         onClick={() => act('select', { id: account.id })}
                       >
-                        切换账号
+                        {t('Switch account')}
                       </Button>
                     )}
                     <Button
@@ -151,7 +160,7 @@ export function AccountSettings({
                       disabled={busy || running}
                       onClick={() => setLogout(account)}
                     >
-                      退出登录
+                      {t('Sign out')}
                     </Button>
                   </>
                 )}
@@ -162,6 +171,7 @@ export function AccountSettings({
       )}
       {running && status && (
         <LoginPanel
+          t={t}
           login={status.login}
           accounts={accounts}
           busy={busy}
@@ -171,20 +181,21 @@ export function AccountSettings({
       )}
       {notice && (
         <p role='status' className='cp:mt-3 cp:mb-0 cp:text-xs cp:text-muted-foreground'>
-          {notice}
+          {t(notice)}
         </p>
       )}
       {failure && (
         <p role='alert' className='cp:mt-3 cp:mb-0 cp:text-sm cp:text-destructive'>
-          {failure}
+          {t(failure)}
         </p>
       )}
       <p className='cp:mt-5 cp:mb-0 cp:text-xs cp:text-muted-foreground'>
-        模型与推理强度在对话的模型菜单中切换。
+        {t('Change models and reasoning effort from the conversation model menu.')}
       </p>
-      <FeatureSettings form={preference} rpc={rpc} />
+      <FeatureSettings form={preference} rpc={rpc} t={t} />
       {logout && (
         <LogoutConfirmation
+          t={t}
           account={logout}
           close={() => setLogout(null)}
           confirm={() => {

@@ -2,7 +2,7 @@
 
 编号：FACT-002。更新：2026-11-07。证据：EVIDENCE-002、EVIDENCE-003、EVIDENCE-004；补充来源随事实列出。
 
-2026-11-07，同一现有 Codex 登录凭据的目录对照表明：插件所用 client_version=0.0.0 缺少 GPT-6.1 Sol/Terra，改为 0.159.0 或 0.167.0 后服务端返回两项且 visibility=list；省略参数返回 400 必填错误。官方将此参数关联 Codex 目录 schema，当前参数误取 Cargo 内部版本；此问题不发生在 SIWC 的公开目录。结论限于目录，未验证新模型实际推理。官方依据及完整实验见 EVIDENCE-034。
+2026-11-07，同一现有 Codex 登录凭据的目录对照表明：诊断时插件所用 client_version=0.0.0 缺少 GPT-6.1 Sol/Terra，改为 0.159.0 或 0.167.0 后服务端返回两项且 visibility=list；省略参数返回 400 必填错误。官方将此参数关联 Codex 目录 schema，原参数误取 Cargo 内部版本；此问题不发生在 SIWC 的公开目录。结论限于目录，未验证新模型实际推理。官方依据、后续修复与实验见 EVIDENCE-034。
 
 2026-11-07 核对 DSH 0.2.2-rc.1 官方 locale 发布库：命名空间可注册中文、英文字典，插槽 locale 元数据让宿主注入 t 并订阅语言变化；其它语言可回退英文。当前宿主模型菜单直接显示 reasoning effort 的字符串 name，没有该字段的翻译注入。插件 React 界面本地化与宿主原生菜单的能力边界不同，依据 EVIDENCE-029。
 

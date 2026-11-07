@@ -130,3 +130,4 @@
 - [x] 深化固定版本文件预算和默认派发调研：确认计价扩展缺口，提出保留 next 的请求级映射候选及固定预留、独立预检的限制；仅静态评估，未解决完整预算或新增实验，依据 EVIDENCE-030。
 - [x] 按用户授权用现有 SIWC 和合成 PDF、TXT 实测公开 token 计数：所测授权被拒，同 token 模型目录对照成功；深化节点计价、usage 锚点、摘要缩小校验及目标切模一致性，未改实际代码，依据 EVIDENCE-033。
 - [x] 排查 Codex 登录缺少 GPT-6.1 Sol/Terra：同凭据目录对照定位 client_version 误取 Cargo 内部版本；仅归档诊断与修复候选，未改代码或安装，新模型推理未验收，依据 EVIDENCE-034。
+- [x] 按用户选择将 legacy 目录 client_version 固定为当前最新正式版本 0.167.0，通过 Rust 测试、fmt、全部目标 Clippy，记录 changeset 并本地提交；重建安装产物、安装及新模型实际推理另行验收，依据 EVIDENCE-034。

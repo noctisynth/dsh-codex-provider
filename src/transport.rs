@@ -91,7 +91,8 @@ impl Transport {
             _ => self
                 .client
                 .get("https://chatgpt.com/backend-api/codex/models")
-                .query(&[("client_version", env!("CARGO_PKG_VERSION"))]),
+                // Catalog compatibility uses the Codex version, not this crate's version.
+                .query(&[("client_version", "0.167.0")]),
         };
         let response = self
             .authorized(session, request)?

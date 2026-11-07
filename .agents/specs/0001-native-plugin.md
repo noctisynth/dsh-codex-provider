@@ -66,6 +66,8 @@ UI 封装迁移至 Base UI 的 Button、Menu、Select 与 Switch，保持 React 
 
 设置 Select 从同一组选项提供 Root 的 items 值与标签映射，供 Value 渲染用户文案，不依赖弹出列表是否已挂载；实际保存值保持原配置契约。
 
+登录区域提取为独立界面组件，复用既有授权状态与 answer/cancel，不改变凭据及登录协议。账号选择以头像、姓名和邮箱呈现，添加账号与取消放入统一底栏；方式选择使用相同的行高、图标及箭头留白。等待和设备码共用区域框架。顶部 48 像素图形加 6 像素内边距，保持原素材；账号方法标签使用 ChatGPT、Codex 浏览器或设备码，标准入口采用“继续使用 ChatGPT”及套餐说明。
+
 本次落地为默认关闭的 codexReview 和三档 searchMode，复用配置表单和紧凑 shadcn Button。审批关闭交给原 answerer；开启时在 approval/request 前置答复，仅生成当前请求的 allowed-once/rejected/cancelled/unavailable。使用会话当前 step、精确 call ID、工具参数与上下文形成独立审查请求；不把工具输出当作用户授权。原实验 Auto 模式不叠加第二次审批。账号轮换与取消继续复用已有模块，审查模型目录资料独立于普通模型列表。
 
 用户已决定暂时保留现有审批开关。选择原实验 Auto 的会话由宿主原有审查链路负责，本插件在生成审查上下文或请求模型前直接交给后续答复者；不把官方 Auto 请求重定向至专用 ChatGPT 审查模型，也不额外重复审查。

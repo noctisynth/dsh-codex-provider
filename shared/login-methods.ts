@@ -1,5 +1,5 @@
 export const loginMethods = [
-  { id: 'siwc', label: 'Sign in with ChatGPT', description: '通过 SIWC 授权使用 ChatGPT 套餐。' },
+  { id: 'siwc', label: '继续使用 ChatGPT', description: '使用你的 ChatGPT 套餐。' },
   {
     id: 'codex-browser',
     label: 'Codex 浏览器（legacy）',
@@ -15,7 +15,7 @@ export const loginMethods = [
 export function loginMethodLabel(method: string) {
   switch (method) {
     case 'siwc':
-      return 'SIWC'
+      return 'ChatGPT'
     case 'codex-browser':
       return 'Codex · 浏览器'
     case 'codex-device':

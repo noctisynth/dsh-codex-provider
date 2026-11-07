@@ -50,3 +50,5 @@ Gravatar 官方图片服务按规范化邮箱的 SHA-256 定位头像，支持�
 2026-11-07 核对：SIWC 官方要求公开 Responses，不能将其授权指向 ChatGPT backend。DSH 随附 pi-ai 1.3.0 的 legacy Codex provider 使用固定客户端、独立 OAuth 地址、账号请求头及 backend Responses；这是发布实现观察，不是第三方公开契约。依据 EVIDENCE-026。
 
 2026-11-07 真实入口探测确认 Codex 设备码服务可签发用户码，当前原生流程能取消；浏览器回调入口也能启动并取消。没有完成用户授权或证明 legacy 推理可用。两种 legacy 登录更新同一账号、SIWC 独立保留是用户确认的产品行为，其实现与验证范围见 EVIDENCE-027。
+
+2026-11-07 官方文档总名称为 Sign in with ChatGPT，当前将使用套餐调用模型的可选能力称为 ChatGPT plan usage；发起登录的推荐用户文案为 Continue with ChatGPT。Token sharing 属于集成与令牌共享语境，不应显示成另一种并列登录方式。依据 EVIDENCE-028。

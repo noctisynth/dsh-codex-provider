@@ -150,7 +150,7 @@ export class Accounts {
       if (vault.accounts.length) {
         const choice = await session.prompt({
           kind: 'select',
-          message: '选择 ChatGPT 注册，或添加账号',
+          message: '选择账号',
           options: [
             ...vault.accounts.map((record) => {
               const account = native.describeSession(record)

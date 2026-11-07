@@ -1,12 +1,13 @@
 import type { ClientConnectionRpc } from '@deepseek-ai/dsh-client-connection/client'
 import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
-import { ArrowRight, Check, LoaderCircle, Plus } from 'lucide-react'
+import { ArrowRight, Check, Plus } from 'lucide-react'
 import { useState } from 'react'
 import type { AccountStatus } from '../shared/account-ui.ts'
 import { loginMethodLabel } from '../shared/login-methods.ts'
 import type { SidebarPreference } from '../shared/sidebar-preference.ts'
 import { AccountAvatar } from './account-avatar.tsx'
 import { FeatureSettings } from './feature-settings.tsx'
+import { LoginPanel } from './login-panel.tsx'
 import { LogoutConfirmation } from './logout-confirmation.tsx'
 import { OpenAiLogo } from './openai-logo.tsx'
 import { Button } from './ui/button.tsx'
@@ -36,9 +37,9 @@ export function AccountSettings({
       aria-busy={!status || busy}
       className={`cp:box-border cp:[&_*]:box-border cp:w-full cp:max-w-3xl cp:text-sm cp:leading-relaxed cp:text-foreground cp:[&_button]:font-[inherit] ${embedded ? 'cp:py-2' : 'cp:py-4'}`}
     >
-      <header className='cp:mb-7 cp:flex cp:flex-wrap cp:items-start cp:justify-between cp:gap-3'>
+      <header className='cp:mb-7 cp:flex cp:flex-wrap cp:items-center cp:justify-between cp:gap-3'>
         <div className='cp:flex cp:items-center cp:gap-3'>
-          <div className='cp:flex cp:shrink-0 cp:items-center cp:justify-center cp:rounded-xl cp:bg-muted'>
+          <div className='cp:flex cp:shrink-0 cp:items-center cp:justify-center cp:rounded-xl cp:bg-muted cp:p-1.5'>
             <OpenAiLogo size={48} />
           </div>
           <div>
@@ -159,81 +160,14 @@ export function AccountSettings({
           ))}
         </div>
       )}
-      {running && (
-        <div className='cp:mt-5 cp:rounded-xl cp:border cp:border-solid cp:border-border cp:bg-muted/30 cp:p-4'>
-          <div role='status' className='cp:flex cp:items-start cp:gap-3'>
-            {!status?.login.prompt && (
-              <LoaderCircle
-                aria-hidden='true'
-                className='cp:mt-1 cp:size-4 cp:shrink-0 cp:animate-spin cp:motion-reduce:animate-none'
-              />
-            )}
-            <div>
-              <div className='cp:font-medium'>
-                {status?.login.prompt?.message ??
-                  (status?.login.device ? '输入设备码' : '等待浏览器授权')}
-              </div>
-              <p className='cp:mt-1 cp:mb-0 cp:text-xs cp:text-muted-foreground'>
-                {status?.login.prompt ? '请选择一种方式继续。' : '完成授权后，这里会自动更新。'}
-              </p>
-            </div>
-          </div>
-          {status?.login.prompt && (
-            <div className='cp:mt-3 cp:space-y-1'>
-              {status.login.prompt.options.map((option) => {
-                const account = accounts.find((account) => account.id === option.id)
-                const label = account
-                  ? `重新登录 ${account.name || account.email || '此账号'}`
-                  : option.id === 'add'
-                    ? '添加新账号'
-                    : option.label
-                return (
-                  <Button
-                    key={option.id}
-                    size='sm'
-                    variant='ghost'
-                    className='cp:group cp:h-auto cp:w-full cp:justify-between cp:gap-4 cp:px-3 cp:has-[>svg]:pr-5 cp:py-3 cp:text-left cp:whitespace-normal'
-                    disabled={busy}
-                    onClick={() => act('answer', { id: option.id })}
-                  >
-                    <span className='cp:min-w-0 cp:break-words'>
-                      <span className='cp:block'>{label}</span>
-                      {option.description && (
-                        <span className='cp:mt-1 cp:block cp:text-xs cp:font-normal cp:text-muted-foreground'>
-                          {option.description}
-                        </span>
-                      )}
-                    </span>
-                    <ArrowRight
-                      aria-hidden='true'
-                      className='cp:transition-transform cp:duration-150 cp:group-hover:translate-x-1 cp:group-focus-visible:translate-x-1 cp:motion-reduce:transition-none cp:motion-reduce:transform-none'
-                    />
-                  </Button>
-                )
-              })}
-            </div>
-          )}
-          {status?.login.device && (
-            <div className='cp:mt-4 cp:flex cp:flex-wrap cp:items-center cp:justify-between cp:gap-3'>
-              <code className='cp:select-all cp:rounded-lg cp:border cp:border-solid cp:border-border cp:bg-background cp:px-4 cp:py-2 cp:font-mono cp:text-lg cp:tracking-widest'>
-                {status.login.device.code}
-              </code>
-              <a
-                href={status.login.device.url}
-                target='_blank'
-                rel='noreferrer'
-                className='cp:text-sm cp:text-foreground cp:underline cp:underline-offset-4'
-              >
-                打开验证页面
-              </a>
-            </div>
-          )}
-          <div className='cp:mt-3 cp:flex cp:justify-end cp:border-0 cp:border-t cp:border-solid cp:border-border cp:pt-3'>
-            <Button size='sm' variant='outline' disabled={busy} onClick={() => act('cancel')}>
-              取消登录
-            </Button>
-          </div>
-        </div>
+      {running && status && (
+        <LoginPanel
+          login={status.login}
+          accounts={accounts}
+          busy={busy}
+          answer={(id) => void act('answer', { id })}
+          cancel={() => void act('cancel')}
+        />
       )}
       {notice && (
         <p role='status' className='cp:mt-3 cp:mb-0 cp:text-xs cp:text-muted-foreground'>

@@ -1,4 +1,8 @@
 export default {
+  'Built-in web search is not available with this sign-in method.':
+    '当前登录方式暂未提供内置网页搜索。',
+  'Built-in web search is not available with this sign-in method. Choose an SIWC account to use it.':
+    '当前登录方式暂未提供内置网页搜索。切换到 SIWC 账号后可使用。',
   'Image detail': '图片精度',
   'Choose the detail used to read attached images. Available levels depend on the model.':
     '选择读取所附图片时使用的精度。可用档位取决于模型。',

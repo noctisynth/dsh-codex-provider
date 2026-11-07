@@ -13,9 +13,11 @@ import type {
 } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { type ComponentType, createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
+import native from '../index.cjs'
 import type { AccountStatus } from '../shared/account-ui.ts'
 import type { SidebarPreference } from '../shared/sidebar-preference.ts'
 import { localeFixture } from './locale-fixture.mts'
+import { sessionRecord } from './session-fixture.mts'
 
 test('the shipped settings preserve account actions, host React sharing and stylesheet disposal', async () => {
   let loaded:
@@ -258,6 +260,7 @@ test('the shipped settings preserve account actions, host React sharing and styl
     {
       id: 'synthetic-account',
       loginMethod: 'siwc',
+      capabilities: native.describeSession(sessionRecord()).capabilities,
       email: 'demo@example.com',
       name: 'Example User',
       picture: 'https://example.invalid/avatar.png',

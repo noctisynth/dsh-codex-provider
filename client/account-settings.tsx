@@ -192,7 +192,12 @@ export function AccountSettings({
       <p className='cp:mt-5 cp:mb-0 cp:text-xs cp:text-muted-foreground'>
         {t('Change models and reasoning effort from the conversation model menu.')}
       </p>
-      <FeatureSettings form={preference} rpc={rpc} t={t} />
+      <FeatureSettings
+        form={preference}
+        rpc={rpc}
+        t={t}
+        capabilities={accounts.find((account) => account.id === status?.active)?.capabilities}
+      />
       {logout && (
         <LogoutConfirmation
           t={t}

@@ -9,7 +9,7 @@ export function chatGptSearch(adapter: ChatGptAdapter, enabled: () => boolean): 
   return {
     id: searchProviderId,
     available: enabled,
-    ready: () => adapter.hasCredentials(),
+    ready: () => adapter.hasSearchCredentials(),
     async search(request, signal) {
       if (!enabled())
         throw new WebError('ChatGPT shared search is off.', 'WEB_PROVIDER_UNAVAILABLE')

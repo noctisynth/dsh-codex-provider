@@ -1,4 +1,8 @@
 export default {
+  'Built-in web search is not available with this sign-in method.':
+    'Built-in web search is not available with this sign-in method.',
+  'Built-in web search is not available with this sign-in method. Choose an SIWC account to use it.':
+    'Built-in web search is not available with this sign-in method. Choose an SIWC account to use it.',
   'Image detail': 'Image detail',
   'Choose the detail used to read attached images. Available levels depend on the model.':
     'Choose the detail used to read attached images. Available levels depend on the model.',

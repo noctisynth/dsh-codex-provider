@@ -93,8 +93,16 @@ export class Accounts {
     return {
       active: vault?.active,
       accounts: (vault?.accounts ?? []).map((record) => {
-        const { id, loginMethod, email, name, picture, hasCredentials, planUsageAuthorized } =
-          native.describeSession(record)
+        const {
+          id,
+          loginMethod,
+          email,
+          name,
+          picture,
+          hasCredentials,
+          planUsageAuthorized,
+          capabilities,
+        } = native.describeSession(record)
         const normalizedEmail = email?.trim().toLowerCase()
         const gravatarPicture = normalizedEmail
           ? `https://gravatar.com/avatar/${createHash('sha256').update(normalizedEmail).digest('hex')}?s=96&d=404&r=g`
@@ -102,6 +110,7 @@ export class Accounts {
         return {
           id,
           loginMethod,
+          capabilities,
           email,
           name,
           picture,

@@ -17,7 +17,14 @@ export interface AccountStatus {
   active?: string
   accounts: (Pick<
     AccountInfo,
-    'id' | 'loginMethod' | 'email' | 'name' | 'picture' | 'hasCredentials' | 'planUsageAuthorized'
+    | 'id'
+    | 'loginMethod'
+    | 'email'
+    | 'name'
+    | 'picture'
+    | 'hasCredentials'
+    | 'planUsageAuthorized'
+    | 'capabilities'
   > & {
     gravatarPicture?: string
   })[]

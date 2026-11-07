@@ -2,6 +2,7 @@ import { addAbortListener } from 'node:events'
 import type { AttachmentStore } from '@deepseek-ai/dsh-attachment'
 import type { GenerateOptions, LlmResolvedModelInfo, StreamChunk } from '@deepseek-ai/dsh-llm'
 import { LlmAdapter, projectToolUpdates } from '@deepseek-ai/dsh-llm'
+import { WebError } from '@deepseek-ai/dsh-web'
 import type { ChatGptClient } from '../index.cjs'
 import native from '../index.cjs'
 import type { ImageDetail, SearchMode } from '../shared/features.ts'
@@ -100,11 +101,25 @@ export class ChatGptAdapter extends LlmAdapter {
   }
 
   async hasCredentials(): Promise<boolean> {
+    return !!(await this.activeAccount())?.hasCredentials
+  }
+
+  async hasSearchCredentials(): Promise<boolean> {
+    const account = await this.activeAccount()
+    return !!(
+      account?.hasCredentials &&
+      account.planUsageAuthorized &&
+      account.capabilities.webSearch
+    )
+  }
+
+  private async activeAccount() {
     const vault = await this.accounts.read()
-    return !!vault?.accounts.some((record) => {
+    if (!vault) return
+    for (const record of vault.accounts) {
       const account = native.describeSession(record)
-      return account.id === vault.active && account.hasCredentials
-    })
+      if (account.id === vault.active) return account
+    }
   }
 
   async reviewModel(parentModel?: string): Promise<LlmResolvedModelInfo> {
@@ -148,6 +163,12 @@ export class ChatGptAdapter extends LlmAdapter {
     let reader: ReadableStreamDefaultReader<NativeStreamChunk> | undefined
     try {
       const record = await this.accounts.selected(operation.cancellation)
+      const webSearch = features.webSearch && native.describeSession(record).capabilities.webSearch
+      if (features.searchOnly && !webSearch)
+        throw new WebError(
+          'Built-in web search is not available with this sign-in method.',
+          'WEB_PROVIDER_UNAVAILABLE',
+        )
       const projected = projectToolUpdates(
         options.messages,
         options.tools,
@@ -156,6 +177,7 @@ export class ChatGptAdapter extends LlmAdapter {
       )
       const request = {
         ...features,
+        webSearch,
         model: options.model,
         messages: await projectImages(projected.messages, this.attachments, options.signal),
         tools: projected.tools,

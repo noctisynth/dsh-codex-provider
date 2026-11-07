@@ -2,6 +2,7 @@ import type { ClientConnectionRpc } from '@deepseek-ai/dsh-client-connection/cli
 import type { Translate } from '@deepseek-ai/dsh-client-locale/client'
 import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { type ReactNode, useRef, useState, useSyncExternalStore } from 'react'
+import type { Capabilities } from '../index.cjs'
 import type { PreferenceKey } from '../shared/features.ts'
 import type { SidebarPreference } from '../shared/sidebar-preference.ts'
 import { setPreference } from './preferences.ts'
@@ -46,12 +47,14 @@ function SettingSelect({
   options,
   disabled,
   onChange,
+  disabledValues = [],
 }: {
   label: string
   value: string
   options: readonly (readonly [string, string])[]
   disabled: boolean
   onChange(value: string): void
+  disabledValues?: readonly string[]
 }) {
   const [container, setContainer] = useState<HTMLElement | null>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -74,7 +77,7 @@ function SettingSelect({
       </SelectTrigger>
       <SelectContent container={container}>
         {options.map(([id, name]) => (
-          <SelectItem key={id} value={id}>
+          <SelectItem key={id} value={id} disabled={disabledValues.includes(id)}>
             {name}
           </SelectItem>
         ))}
@@ -87,10 +90,12 @@ export function FeatureSettings({
   form,
   rpc,
   t,
+  capabilities,
 }: {
   form: ConfigForm<SidebarPreference>
   rpc: ClientConnectionRpc
   t: Translate
+  capabilities?: Capabilities
 }) {
   const snapshot = useSyncExternalStore(
     (listener) => form.subscribe(listener),
@@ -114,6 +119,7 @@ export function FeatureSettings({
     }
   }
   const disabled = !!saving || snapshot.status !== 'ready' || !snapshot.writable
+  const canSearch = capabilities?.webSearch !== false
   return (
     <div className='cp:mt-5 cp:border-0 cp:border-t cp:border-solid cp:border-border'>
       <SettingRow
@@ -151,7 +157,9 @@ export function FeatureSettings({
       <SettingRow
         title={t('Web search')}
         description={t(
-          "Choose which models use ChatGPT web search. Searches use your current ChatGPT account allowance. Turn this off to use DSH's original search.",
+          canSearch
+            ? "Choose which models use ChatGPT web search. Searches use your current ChatGPT account allowance. Turn this off to use DSH's original search."
+            : 'Built-in web search is not available with this sign-in method. Choose an SIWC account to use it.',
         )}
         error={error?.key === 'searchMode' ? t(error.message) : undefined}
       >
@@ -165,6 +173,7 @@ export function FeatureSettings({
           ]}
           disabled={disabled}
           onChange={(value) => void save('searchMode', value)}
+          disabledValues={canSearch ? [] : ['chatgpt', 'all']}
         />
       </SettingRow>
       <SettingRow

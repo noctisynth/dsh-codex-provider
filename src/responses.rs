@@ -49,6 +49,11 @@ pub(crate) fn stream(
         if !session.plan_usage_authorized() {
             Err(Error::Auth("ChatGPT plan usage was not authorized"))?;
         }
+        if !session.login_method.capabilities().web_search
+            && request.tools.as_ref().is_some_and(|tools| tools.iter().any(|tool| tool["type"] == "web_search"))
+        {
+            Err(Error::Protocol("Built-in web search is not available with this sign-in method."))?;
+        }
         let response = tokio::select! {
             _ = cancel.cancelled() => Err(Error::Cancelled),
             response = transport.response(&session, &request) => response,

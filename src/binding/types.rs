@@ -1,9 +1,10 @@
 use napi_derive::napi;
 
-use crate::{auth, error::Error, models};
+use crate::{auth, capabilities::Capabilities, error::Error, models};
 
 #[napi(object)]
 pub struct AccountInfo {
+    pub capabilities: Capabilities,
     pub id: String,
     pub login_method: String,
     pub client_id: String,
@@ -18,6 +19,7 @@ pub struct AccountInfo {
 impl From<&auth::Session> for AccountInfo {
     fn from(session: &auth::Session) -> Self {
         Self {
+            capabilities: session.login_method.capabilities(),
             id: session.key(),
             login_method: session.login_method.as_str().into(),
             client_id: session.client_id.clone(),

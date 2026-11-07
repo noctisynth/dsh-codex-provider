@@ -99,8 +99,8 @@ pub(crate) async fn revoke(
     session: &Session,
     cancel: &CancellationToken,
 ) -> bool {
-    match session.login_method {
-        LoginMethod::Siwc => siwc::logout::revoke(http, session, cancel).await,
-        _ => false,
+    if !session.login_method.capabilities().remote_revocation {
+        return false;
     }
+    siwc::logout::revoke(http, session, cancel).await
 }

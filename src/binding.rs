@@ -243,7 +243,7 @@ impl ChatGptClient {
         Ok(LogoutResult {
             record: session.encode()?,
             revocation_confirmed: confirmed,
-            local_only: session.login_method != auth::LoginMethod::Siwc,
+            local_only: !session.login_method.capabilities().remote_revocation,
         })
     }
 

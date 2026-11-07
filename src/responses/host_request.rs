@@ -15,9 +15,21 @@ struct GenerateOptions {
     tools: Option<Vec<Tool>>,
     reasoning_effort: Option<String>,
     #[serde(default)]
+    image_detail: ImageDetail,
+    #[serde(default)]
     web_search: bool,
     #[serde(default)]
     search_only: bool,
+}
+
+#[derive(Clone, Copy, Default, Deserialize, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
+enum ImageDetail {
+    #[default]
+    Auto,
+    Low,
+    High,
+    Original,
 }
 
 #[derive(Deserialize)]
@@ -98,7 +110,7 @@ pub(crate) fn from_host(json: &str) -> Result<Request, Error> {
                         .filter(|url| !url.is_empty())
                         .ok_or(Error::Protocol("DSH image omitted its resolved data URL"))?;
                     input.push(json!({"role":"user","content":[{
-                        "type":"input_image", "image_url":url, "detail":"auto"
+                        "type":"input_image", "image_url":url, "detail":options.image_detail
                     }]}));
                 }
                 Some("tool-call") => input.push(json!({
@@ -174,6 +186,24 @@ mod tests {
         );
         assert_eq!(request.input[2]["content"][0]["detail"], "auto");
         assert_eq!(request.input[4]["content"], "Which is red?");
+        Ok(())
+    }
+
+    #[test]
+    fn image_detail_reaches_every_retained_image_and_rejects_unknown_values() -> Result<(), Error> {
+        let mut options = json!({"model":"vision","messages":[
+            {"role":"user","content":[{"type":"image","imageUrl":"data:image/png;base64,one"}]},
+            {"role":"user","content":[{"type":"image","imageUrl":"data:image/png;base64,two"}]}
+        ]});
+        for detail in ["auto", "low", "high", "original"] {
+            options["imageDetail"] = json!(detail);
+            let request = from_host(&options.to_string())?;
+            for item in request.input {
+                assert_eq!(item["content"][0]["detail"], detail);
+            }
+        }
+        options["imageDetail"] = json!("unsupported");
+        assert!(from_host(&options.to_string()).is_err());
         Ok(())
     }
 

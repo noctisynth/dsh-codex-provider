@@ -1,4 +1,11 @@
 export default {
+  'Image detail': 'Image detail',
+  'Choose the detail used to read attached images. Available levels depend on the model.':
+    'Choose the detail used to read attached images. Available levels depend on the model.',
+  Automatic: 'Automatic',
+  Low: 'Low',
+  High: 'High',
+  Original: 'Original',
   'ChatGPT accounts': 'ChatGPT accounts',
   'Manage accounts for Codex models.': 'Manage accounts for Codex models.',
   'Add account': 'Add account',

@@ -222,6 +222,12 @@ test('the shipped settings preserve account actions, host React sharing and styl
       reviewControl.props.onCheckedChange(true)
     })
     assert.equal(snapshot.value?.codexReview, true)
+    const image = view.root
+      .findAllByType('button')
+      .find((button) => button.props['aria-label'] === '图片精度')
+    assert.ok(image)
+    assert.equal(image.props.role, 'combobox')
+    assert.ok(image.findAllByType('span').some((span) => span.children.includes('自动')))
     const search = view.root
       .findAllByType('button')
       .find((button) => button.props['aria-label'] === '网页搜索')

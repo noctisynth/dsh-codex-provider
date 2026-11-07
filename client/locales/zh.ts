@@ -1,4 +1,11 @@
 export default {
+  'Image detail': '图片精度',
+  'Choose the detail used to read attached images. Available levels depend on the model.':
+    '选择读取所附图片时使用的精度。可用档位取决于模型。',
+  Automatic: '自动',
+  Low: '低',
+  High: '高',
+  Original: '原图',
   'ChatGPT accounts': 'ChatGPT 账号设置',
   'Manage accounts for Codex models.': '管理用于 Codex 模型的账号。',
   'Add account': '添加账号',

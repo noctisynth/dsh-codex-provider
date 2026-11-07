@@ -167,6 +167,26 @@ export function FeatureSettings({
           onChange={(value) => void save('searchMode', value)}
         />
       </SettingRow>
+      <SettingRow
+        title={t('Image detail')}
+        description={t(
+          'Choose the detail used to read attached images. Available levels depend on the model.',
+        )}
+        error={error?.key === 'imageDetail' ? t(error.message) : undefined}
+      >
+        <SettingSelect
+          label={t('Image detail')}
+          value={snapshot.value?.imageDetail ?? 'auto'}
+          options={[
+            ['auto', t('Automatic')],
+            ['low', t('Low')],
+            ['high', t('High')],
+            ['original', t('Original')],
+          ]}
+          disabled={disabled}
+          onChange={(value) => void save('imageDetail', value)}
+        />
+      </SettingRow>
     </div>
   )
 }

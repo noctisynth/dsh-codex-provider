@@ -4,7 +4,7 @@ import type { GenerateOptions, LlmResolvedModelInfo, StreamChunk } from '@deepse
 import { LlmAdapter, projectToolUpdates } from '@deepseek-ai/dsh-llm'
 import type { ChatGptClient } from '../index.cjs'
 import native from '../index.cjs'
-import type { SearchMode } from '../shared/features.ts'
+import type { ImageDetail, SearchMode } from '../shared/features.ts'
 import type { Accounts } from './accounts.ts'
 import type { NativeStreamChunk } from './errors.ts'
 import { providerError } from './errors.ts'
@@ -21,6 +21,7 @@ export class ChatGptAdapter extends LlmAdapter {
   private attachments?: Pick<AttachmentStore, 'readImage'>
   private catalog: Promise<CatalogEntry[]> | undefined
   private searchMode: () => SearchMode
+  private imageDetail: () => ImageDetail
 
   constructor(
     client: ChatGptClient,
@@ -28,6 +29,7 @@ export class ChatGptAdapter extends LlmAdapter {
     operations: Operations,
     attachments?: Pick<AttachmentStore, 'readImage'>,
     searchMode: () => SearchMode = () => 'off',
+    imageDetail: () => ImageDetail = () => 'auto',
   ) {
     super()
     this.client = client
@@ -35,6 +37,7 @@ export class ChatGptAdapter extends LlmAdapter {
     this.operations = operations
     this.attachments = attachments
     this.searchMode = searchMode
+    this.imageDetail = imageDetail
   }
 
   providerInfo() {
@@ -158,6 +161,7 @@ export class ChatGptAdapter extends LlmAdapter {
         tools: projected.tools,
         system: options.system,
         reasoningEffort: options.reasoningEffort,
+        imageDetail: this.imageDetail(),
       }
       reader = this.client
         .streamResponse(record, JSON.stringify(request), operation.cancellation)

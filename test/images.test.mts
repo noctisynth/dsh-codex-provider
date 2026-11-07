@@ -8,6 +8,7 @@ import type { Accounts } from '../plugin/accounts.ts'
 import { ChatGptAdapter } from '../plugin/adapter.ts'
 import { projectImages } from '../plugin/images.ts'
 import { Operations } from '../plugin/operations.ts'
+import { type ImageDetail, imageDetails } from '../shared/features.ts'
 import { sessionRecord } from './session-fixture.mts'
 
 test('DSH preserves images for vision models and projects text-only and offloaded images without reads', async () => {
@@ -50,7 +51,10 @@ test('DSH preserves images for vision models and projects text-only and offloade
       return { ref, data: new Uint8Array([1, 2, 3]) }
     },
   }
-  let request: { messages: { content: { type: string; imageUrl?: string }[] }[] } = { messages: [] }
+  let request: {
+    messages: { content: { type: string; imageUrl?: string }[] }[]
+    imageDetail?: ImageDetail
+  } = { messages: [] }
   client.streamResponse = (_record, json) => {
     request = JSON.parse(json)
     return new ReadableStream({
@@ -61,7 +65,15 @@ test('DSH preserves images for vision models and projects text-only and offloade
     })
   }
   const operations = new Operations()
-  const adapter = new ChatGptAdapter(client, accounts, operations, attachments)
+  let imageDetail: ImageDetail = 'auto'
+  const adapter = new ChatGptAdapter(
+    client,
+    accounts,
+    operations,
+    attachments,
+    undefined,
+    () => imageDetail,
+  )
   const unregister = ctx.llm.registerAdapter(['openai-codex'], adapter)
   try {
     for await (const chunk of ctx.llm.stream({
@@ -75,6 +87,7 @@ test('DSH preserves images for vision models and projects text-only and offloade
     assert.equal(request.messages[0].content[1].imageUrl, 'data:image/png;base64,AQID')
     assert.equal(request.messages[0].content[2].imageUrl, 'data:image/png;base64,AQID')
     assert.equal(request.messages[0].content[3].type, 'text')
+    assert.equal(request.imageDetail, 'auto')
     for await (const _ of ctx.llm.stream({ provider: 'openai-codex', model: 'text', messages })) {
       /* consume */
     }
@@ -93,6 +106,18 @@ test('DSH preserves images for vision models and projects text-only and offloade
       }),
       /missing attachment/,
     )
+    for (const detail of imageDetails) {
+      imageDetail = detail
+      for await (const _ of ctx.llm.stream({
+        provider: 'openai-codex',
+        model: 'vision',
+        messages,
+      })) {
+        /* consume */
+      }
+      assert.equal(request.imageDetail, detail)
+      assert.equal(JSON.stringify(messages), before)
+    }
   } finally {
     unregister()
     operations.dispose()

@@ -2,7 +2,7 @@ import type { Context, Fiber, Volatile } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-config-editor'
 import type {} from '@deepseek-ai/dsh-settings'
 import type {} from '@deepseek-ai/dsh-web'
-import type { SearchMode } from '../shared/features.ts'
+import type { ImageDetail, SearchMode } from '../shared/features.ts'
 
 export const searchProviderId = 'chatgpt'
 
@@ -104,12 +104,17 @@ type PreferenceChange =
   | { key: 'sidebarAccount'; value: 'deepseek' | 'chatgpt' }
   | { key: 'codexReview'; value: boolean }
   | { key: 'searchMode'; value: SearchMode }
+  | { key: 'imageDetail'; value: ImageDetail }
 
 function parsePreference(payload: unknown): PreferenceChange {
   if (!payload || typeof payload !== 'object' || !('key' in payload) || !('value' in payload))
     throw new Error('Invalid settings parameters.')
   const { key, value } = payload
   switch (key) {
+    case 'imageDetail':
+      if (value === 'auto' || value === 'low' || value === 'high' || value === 'original')
+        return { key, value }
+      break
     case 'sidebarAccount':
       if (value === 'deepseek' || value === 'chatgpt') return { key, value }
       break

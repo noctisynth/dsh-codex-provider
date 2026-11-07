@@ -4,7 +4,7 @@ import type {} from '@deepseek-ai/dsh-settings'
 import type {} from '@deepseek-ai/dsh-web'
 import z from '@deepseek-ai/schemastery'
 import native from '../index.cjs'
-import type { SearchMode } from '../shared/features.ts'
+import { type ImageDetail, imageDetails, type SearchMode } from '../shared/features.ts'
 import { mountAccountUi } from './account-ui.ts'
 import { Accounts, accountsKey } from './accounts.ts'
 import { ChatGptAdapter, provider } from './adapter.ts'
@@ -19,6 +19,7 @@ export const Config = z.object({
   sidebarAccount: z.union(['deepseek', 'chatgpt']).default('deepseek').volatile(),
   codexReview: z.boolean().default(false).volatile(),
   searchMode: z.union(['off', 'chatgpt', 'all']).default('off').volatile(),
+  imageDetail: z.union(imageDetails).default('auto').volatile(),
   previousSearchProvider: z.string().hidden().volatile(),
 })
 
@@ -26,6 +27,7 @@ export interface Config {
   sidebarAccount: Volatile<'deepseek' | 'chatgpt'>
   codexReview: Volatile<boolean>
   searchMode: Volatile<SearchMode>
+  imageDetail: Volatile<ImageDetail>
   previousSearchProvider: Volatile<string | undefined>
 }
 
@@ -45,8 +47,13 @@ export function apply(ctx: Context, config: Config): void {
       run: (session) => accounts.authorize(session),
     }),
   )
-  const adapter = new ChatGptAdapter(client, accounts, operations, ctx.attachments, () =>
-    config.searchMode.get(),
+  const adapter = new ChatGptAdapter(
+    client,
+    accounts,
+    operations,
+    ctx.attachments,
+    () => config.searchMode.get(),
+    () => config.imageDetail.get(),
   )
   ctx.on('credentials/record-updated', (key) => {
     if (key === accountsKey) adapter.invalidateCatalog()

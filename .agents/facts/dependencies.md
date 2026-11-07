@@ -12,6 +12,7 @@
 
 | 事实 | 适用限制 |
 |---|---|
+| legacy 的 Codex Responses 接受现有内置 web_search 参数；Sol、Astra 及多轮搜索真实完成，最终原生和 DSH 共享搜索验证通过 | 2026-11-07 所测凭据及模型；复用既有链路开放能力，见 EVIDENCE-036 |
 | SIWC 合成 PDF、文本与 Sol/Astra 四档图片精度完成；插件图片精度已接入，原生文件受宿主默认投影阻塞 | 2026-11-07 所测账号及模型，用户暂缓文件接入；见 EVIDENCE-031 |
 | SIWC Responses 服务端自动压缩生成加密项且可续写；独立 compact 路由与 configuration_update 被当前授权拒绝 | 所测公开路由及 Sol，不推导所有模型和未来策略；见 EVIDENCE-032 |
 | napi-rs 3 提供 Tokio 异步与 Web Streams | 项目取消、背压和宿主兼容未验证 |

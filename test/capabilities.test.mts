@@ -9,7 +9,7 @@ import { Operations } from '../plugin/operations.ts'
 import { chatGptSearch } from '../plugin/web-search.ts'
 import { sessionRecord } from './session-fixture.mts'
 
-test('native route capabilities govern search, account switches and local legacy logout', async () => {
+test('native route capabilities govern shared search, preferences and local legacy logout', async () => {
   const siwc = sessionRecord()
   const legacy = (method: string) =>
     JSON.stringify({
@@ -26,7 +26,7 @@ test('native route capabilities govern search, account switches and local legacy
   assert.deepEqual(native.describeSession(device).capabilities, legacyCapabilities)
   assert.equal(siwcCapabilities.webSearch, true)
   assert.equal(siwcCapabilities.remoteRevocation, true)
-  assert.equal(legacyCapabilities.webSearch, false)
+  assert.equal(legacyCapabilities.webSearch, true)
   assert.equal(legacyCapabilities.remoteRevocation, false)
   for (const capabilities of [siwcCapabilities, legacyCapabilities]) {
     assert.ok(Object.values(capabilities).every((value) => typeof value === 'boolean'))
@@ -42,7 +42,7 @@ test('native route capabilities govern search, account switches and local legacy
   } as unknown as Accounts
   const client = new native.ChatGptClient({})
   client.listModels = async () => [{ id: 'test', name: 'Test' }]
-  const requests: { webSearch: boolean }[] = []
+  const requests: { webSearch: boolean; searchOnly?: boolean }[] = []
   client.streamResponse = (_record, json) => {
     requests.push(JSON.parse(json))
     return new ReadableStream({
@@ -53,7 +53,8 @@ test('native route capabilities govern search, account switches and local legacy
     })
   }
   const operations = new Operations()
-  const adapter = new ChatGptAdapter(client, accounts, operations, undefined, () => 'all')
+  let searchMode: 'all' | 'off' = 'all'
+  const adapter = new ChatGptAdapter(client, accounts, operations, undefined, () => searchMode)
   const search = chatGptSearch(adapter, () => true)
   assert.ok(search.ready)
   const ctx = new Context()
@@ -73,38 +74,33 @@ test('native route capabilities govern search, account switches and local legacy
       }))
         assert.equal(chunk.type, 'finish')
       assert.equal(requests.at(-1)?.webSearch, supported)
-      if (!supported) {
-        const before = requests.length
-        await assert.rejects(async () => {
-          for await (const _ of adapter.search('synthetic query')) {
-            /* consume */
-          }
-        }, /Built-in web search is not available/)
-        assert.equal(requests.length, before)
+      const before = requests.length
+      assert.equal(await search.ready(undefined), true)
+      assert.equal(requests.length, before)
+      for await (const _ of adapter.search('synthetic query')) {
+        /* consume */
       }
+      assert.equal(requests.length, before + 1)
+      assert.equal(requests.at(-1)?.webSearch, true)
+      assert.equal(requests.at(-1)?.searchOnly, true)
     }
-    const cancellation = new native.Cancellation()
+    current = JSON.stringify({ ...JSON.parse(siwc), scopes: [] })
+    assert.equal(await search.ready(undefined), false)
+    current = JSON.stringify({ ...JSON.parse(device), access_token: '', refresh_token: '' })
+    assert.equal(await search.ready(undefined), false)
+    current = browser
+    for (const purpose of [undefined, 'auto-review'] as const) {
+      searchMode = purpose ? 'all' : 'off'
+      for await (const chunk of ctx.llm.stream({
+        provider: 'openai-codex',
+        model: 'test',
+        purpose,
+        messages: [{ role: 'user', content: [{ type: 'text', text: 'Hello' }] }],
+      }))
+        assert.equal(chunk.type, 'finish')
+      assert.equal(requests.at(-1)?.webSearch, false)
+    }
     const rawClient = new native.ChatGptClient({})
-    const reader = rawClient
-      .streamResponse(
-        browser,
-        JSON.stringify({
-          model: 'test',
-          messages: [],
-          webSearch: true,
-        }),
-        cancellation,
-      )
-      .getReader()
-    try {
-      const { value } = await reader.read()
-      assert.equal(value.type, 'provider-error')
-      assert.match(value.error.message, /Built-in web search is not available/)
-    } finally {
-      cancellation.cancel()
-      await reader.cancel()
-      reader.releaseLock()
-    }
     const result = await rawClient.logoutSession(device, new native.Cancellation())
     assert.equal(result.localOnly, true)
     assert.equal(result.revocationConfirmed, false)

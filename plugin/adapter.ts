@@ -180,6 +180,7 @@ export class ChatGptAdapter extends LlmAdapter {
         ...features,
         webSearch,
         model: options.model,
+        sessionId: options.sessionId,
         messages: await projectImages(projected.messages, this.attachments, options.signal),
         tools: projected.tools,
         system: options.system,

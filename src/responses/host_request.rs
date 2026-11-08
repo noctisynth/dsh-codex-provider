@@ -1,5 +1,7 @@
+use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use serde::Deserialize;
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 
 use super::{Request, reasoning_cache};
 use crate::error::Error;
@@ -10,6 +12,7 @@ pub(super) const REPLAY_FORMAT: &str = "dsh-codex-provider/responses";
 #[serde(rename_all = "camelCase")]
 struct GenerateOptions {
     model: String,
+    session_id: Option<String>,
     messages: Vec<Message>,
     system: Option<String>,
     tools: Option<Vec<Tool>>,
@@ -150,6 +153,10 @@ pub(crate) fn from_host(json: &str) -> Result<Request, Error> {
     }
     Ok(Request {
         model: options.model,
+        prompt_cache_key: options
+            .session_id
+            .filter(|id| !id.is_empty())
+            .map(|id| URL_SAFE_NO_PAD.encode(Sha256::digest(id.as_bytes()))),
         input,
         instructions: options.system,
         tools: if tools.is_empty() { None } else { Some(tools) },
@@ -171,6 +178,45 @@ pub(crate) fn from_host(json: &str) -> Result<Request, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn prompt_cache_key_is_stable_bounded_and_omitted_without_a_session()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut options = json!({"model":"test","messages":[],"sessionId":"dsh-session-a"});
+        let first = serde_json::to_value(from_host(&options.to_string())?)?;
+        assert_eq!(
+            first["prompt_cache_key"],
+            "dTl4QO2xLq1MCRJSwjSlGJIJwJlKiVR4a3zANGDvljs"
+        );
+        assert!(first.get("sessionId").is_none());
+        // A new parse after restoring serialized host options must retain the key,
+        // even when the next turn changes model, effort, or input.
+        options = serde_json::from_str(&options.to_string())?;
+        options["model"] = json!("other-model");
+        options["reasoningEffort"] = json!("high");
+        options["messages"] =
+            json!([{"role":"user","content":[{"type":"text","text":"Next turn"}]}]);
+        let next = serde_json::to_value(from_host(&options.to_string())?)?;
+        assert_eq!(next["prompt_cache_key"], first["prompt_cache_key"]);
+        let shared_prefix = "session-".repeat(20);
+        options["sessionId"] = json!(format!("{shared_prefix}a"));
+        let long = serde_json::to_value(from_host(&options.to_string())?)?;
+        assert_eq!(long["prompt_cache_key"].as_str().map(str::len), Some(43));
+        options["sessionId"] = json!(format!("{shared_prefix}b"));
+        let other = serde_json::to_value(from_host(&options.to_string())?)?;
+        assert_ne!(other["prompt_cache_key"], long["prompt_cache_key"]);
+        for id in [Value::Null, json!("")] {
+            options["sessionId"] = id;
+            assert!(
+                serde_json::to_value(from_host(&options.to_string())?)?
+                    .get("prompt_cache_key")
+                    .is_none()
+            );
+        }
+        let missing = serde_json::to_value(from_host(r#"{"model":"test","messages":[]}"#)?)?;
+        assert!(missing.get("prompt_cache_key").is_none());
+        Ok(())
+    }
 
     #[test]
     fn images_preserve_order_and_survive_followup_history() -> Result<(), Error> {

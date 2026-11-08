@@ -4,6 +4,8 @@
 
 ## 组件职责
 
+宿主适配只透传正式 GenerateOptions.sessionId，由 Rust 将非空会话 ID 的 SHA-256 摘要编码为无填充 Base64URL，作为固定 43 字符的 prompt_cache_key；不依赖账号令牌、模型、档位、请求次数或进程随机量。缺少或空 ID 时省略字段，保留原有 SSE、store=false 和完整历史重放。该字段只作为请求元数据，不加入模型输入、配置或持久化重放副本；不改变档位更新检查点的内容校验。真实支持与验证边界由 EVIDENCE-040 维护。
+
 Responses 用量转换将 input_tokens 拆为普通输入、cached_tokens 和 cache_write_tokens 三个互斥桶；缓存写入缺失时按零处理，输出中的 reasoning_tokens 不重复计入总量。向 DSH 上报独立 cacheWriteTokens，不改变服务端总输入、输出及总量的口径。
 
 新增 configuration_update 布尔能力（TypeScript 为 configurationUpdate），仅过时登录为 true；当前仅用于推理档位更新，同时要求模型目录 supports_reasoning_effort_updates=true，且请求为普通对话。Rust 在成功输出的重放资料中保存请求前缀校验及档位更新位置，后续保持初始顶层 effort，并在新输入前插入 configuration_update；历史重放必须保留原位置。账号、模型、指令、工具或历史前缀变化时不复用检查点，重新以当前选择建立基线。辅助请求及 SIWC 不发送更新项；取消和失败不写入检查点，不增加预热调用、用户开关或上下文预算。具体协议依据与验证边界由 EVIDENCE-039 维护。

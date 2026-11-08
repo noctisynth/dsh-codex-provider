@@ -29,6 +29,8 @@ pub(crate) struct Request {
     reasoning: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     include: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    prompt_cache_key: Option<String>,
     #[serde(skip)]
     cache: reasoning_cache::Options,
 }

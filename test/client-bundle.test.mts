@@ -43,6 +43,8 @@ test('the shipped settings preserve account actions, host React sharing and styl
     Event,
     setTimeout,
     clearTimeout,
+    setInterval,
+    clearInterval,
     HTMLFormElement: class {},
     document: {
       visibilityState: 'visible',
@@ -114,7 +116,7 @@ test('the shipped settings preserve account actions, host React sharing and styl
         return {
           ok: true,
           value: {
-            plan: 'pro',
+            plan: 'prolite',
             windows: [
               { name: 'Codex', windowSeconds: 18000, remainingPercent: 80, resetsAt: 2000000000 },
             ],
@@ -395,6 +397,8 @@ test('the shipped settings preserve account actions, host React sharing and styl
     hasCredentials: true,
     capabilities: legacy.capabilities,
   }))
+  active = accounts[0].id
+  let quotaSidebar: ReactTestRenderer | undefined
   try {
     await act(async () => {
       view = create(createElement(Settings, { rpc, preference, t, embedded: true }))
@@ -403,6 +407,34 @@ test('the shipped settings preserve account actions, host React sharing and styl
     for (const text of ['订阅用量', 'Pro', '80', '3.5', '5 小时额度'])
       assert.ok(JSON.stringify(view.toJSON()).includes(text))
     assert.equal(view.root.findByType('progress').props.value, 80)
+    const initialQueries = requests.filter((request) => request.method.endsWith('/quota')).length
+    await act(async () => {
+      await rpc.call('/api', 'codex-provider/preference', {
+        key: 'sidebarAccount',
+        value: 'chatgpt',
+      })
+    })
+    assert.ok(launcher)
+    const QuotaLauncher = launcher
+    await act(async () => {
+      quotaSidebar = create(
+        createElement(QuotaLauncher, {
+          t,
+          rpc,
+          form: preference,
+          wide: true,
+          settingsOpen: false,
+          openSettings() {},
+          openOnboarding() {},
+        }),
+      )
+    })
+    assert.equal(
+      requests.filter((request) => request.method.endsWith('/quota')).length,
+      initialQueries,
+    )
+    assert.ok(quotaSidebar)
+    assert.match(JSON.stringify(quotaSidebar.toJSON()), /5 小时额度 80%/)
     const refresh = view.root
       .findAllByType('button')
       .find((button) => button.props['aria-label'] === '刷新用量')
@@ -412,11 +444,13 @@ test('the shipped settings preserve account actions, host React sharing and styl
       refresh.props.onClick()
     })
     assert.equal(requests.filter((request) => request.method.endsWith('/quota')).length, before + 1)
+    assert.match(JSON.stringify(quotaSidebar.toJSON()), /5 小时额度 80%/)
     quotaUnavailable = true
     await act(async () => {
       refresh.props.onClick()
     })
     assert.equal(view.root.findAllByType('progress').length, 0)
+    assert.match(JSON.stringify(quotaSidebar.toJSON()), /额度暂不可用/)
     assert.match(JSON.stringify(view.toJSON()), /暂时无法读取用量/)
     accounts = accounts.map((account) => ({
       ...account,
@@ -428,7 +462,12 @@ test('the shipped settings preserve account actions, host React sharing and styl
     assert.equal(view.root.findAllByType('progress').length, 0)
   } finally {
     await act(async () => {
+      quotaSidebar?.unmount()
       view?.unmount()
+      await rpc.call('/api', 'codex-provider/preference', {
+        key: 'sidebarAccount',
+        value: 'deepseek',
+      })
     })
   }
   let sidebar: ReactTestRenderer | undefined

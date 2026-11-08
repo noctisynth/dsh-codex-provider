@@ -1,4 +1,16 @@
 export default {
+  Weekly: '每周',
+  'Resets soon': '即将重置',
+  'Resets in {days}d {hours}h': '{days}天{hours}小时 后重置',
+  'Resets in {hours}h {minutes}m': '{hours}小时{minutes}分钟 后重置',
+  'Resets in {minutes}m': '{minutes}分钟 后重置',
+  'Usage unavailable': '额度暂不可用',
+  'Usage refresh': '额度刷新',
+  'Every minute': '每分钟',
+  'Every 5 minutes': '每 5 分钟',
+  'Every 15 minutes': '每 15 分钟',
+  'Usage is shown only for legacy sign-ins, in account settings and the ChatGPT sidebar. Choose how often it refreshes automatically, or refresh it manually from the account menu.':
+    '仅过时登录方式展示额度，显示在账号设置和 ChatGPT 侧边栏。可选择自动刷新间隔，也可从账号菜单手动刷新。',
   'Subscription usage': '订阅用量',
   'Refresh usage': '刷新用量',
   Refresh: '刷新',

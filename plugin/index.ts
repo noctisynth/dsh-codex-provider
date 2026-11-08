@@ -4,7 +4,13 @@ import type {} from '@deepseek-ai/dsh-settings'
 import type {} from '@deepseek-ai/dsh-web'
 import z from '@deepseek-ai/schemastery'
 import native from '../index.cjs'
-import { type ImageDetail, imageDetails, type SearchMode } from '../shared/features.ts'
+import {
+  type ImageDetail,
+  imageDetails,
+  type QuotaRefreshInterval,
+  quotaRefreshIntervals,
+  type SearchMode,
+} from '../shared/features.ts'
 import { mountAccountUi } from './account-ui.ts'
 import { Accounts, accountsKey } from './accounts.ts'
 import { ChatGptAdapter, provider } from './adapter.ts'
@@ -21,6 +27,7 @@ export const Config = z.object({
   codexReview: z.boolean().default(false).volatile(),
   searchMode: z.union(['off', 'chatgpt', 'all']).default('off').volatile(),
   imageDetail: z.union(imageDetails).default('auto').volatile(),
+  quotaRefresh: z.union(quotaRefreshIntervals).default('5').volatile(),
   previousSearchProvider: z.string().hidden().volatile(),
 })
 
@@ -29,6 +36,7 @@ export interface Config {
   codexReview: Volatile<boolean>
   searchMode: Volatile<SearchMode>
   imageDetail: Volatile<ImageDetail>
+  quotaRefresh: Volatile<QuotaRefreshInterval>
   previousSearchProvider: Volatile<string | undefined>
 }
 

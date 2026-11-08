@@ -141,6 +141,26 @@ export function FeatureSettings({
         />
       </SettingRow>
       <SettingRow
+        title={t('Usage refresh')}
+        description={t(
+          'Usage is shown only for legacy sign-ins, in account settings and the ChatGPT sidebar. Choose how often it refreshes automatically, or refresh it manually from the account menu.',
+        )}
+        error={error?.key === 'quotaRefresh' ? t(error.message) : undefined}
+      >
+        <SettingSelect
+          label={t('Usage refresh')}
+          value={snapshot.value?.quotaRefresh ?? '5'}
+          options={[
+            ['0', t('Off')],
+            ['1', t('Every minute')],
+            ['5', t('Every 5 minutes')],
+            ['15', t('Every 15 minutes')],
+          ]}
+          disabled={disabled}
+          onChange={(value) => void save('quotaRefresh', value)}
+        />
+      </SettingRow>
+      <SettingRow
         title={t('Review with ChatGPT')}
         description={t(
           'Use ChatGPT to review operations that need your confirmation, for all models. Reviews use your current ChatGPT account allowance. Turn this off to confirm operations yourself. With official Auto selected, reviews use the conversation model without an additional ChatGPT reviewer call.',

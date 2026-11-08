@@ -136,6 +136,7 @@ test('sidebar preference persists through host settings without remounting autho
       codexReview: false,
       searchMode: 'off',
       imageDetail: 'auto',
+      quotaRefresh: '5',
     })
     assert.equal(descriptor.autoGenerate, false)
     const entry = host.ctx.configEditor.entries().find((row) => row.options.id === 'codex-provider')
@@ -144,7 +145,13 @@ test('sidebar preference persists through host settings without remounting autho
     await host.set('sidebarAccount', 'chatgpt')
     assert.deepEqual(
       host.ctx.settings.describe().find((row) => row.ns === 'codex-provider')?.value,
-      { sidebarAccount: 'chatgpt', codexReview: false, searchMode: 'off', imageDetail: 'auto' },
+      {
+        sidebarAccount: 'chatgpt',
+        codexReview: false,
+        searchMode: 'off',
+        imageDetail: 'auto',
+        quotaRefresh: '5',
+      },
     )
     assert.equal(entry.fiber, originalFiber)
     assert.equal(mounts, 1)
@@ -153,12 +160,24 @@ test('sidebar preference persists through host settings without remounting autho
     host = await start()
     assert.deepEqual(
       host.ctx.settings.describe().find((row) => row.ns === 'codex-provider')?.value,
-      { sidebarAccount: 'chatgpt', codexReview: false, searchMode: 'off', imageDetail: 'auto' },
+      {
+        sidebarAccount: 'chatgpt',
+        codexReview: false,
+        searchMode: 'off',
+        imageDetail: 'auto',
+        quotaRefresh: '5',
+      },
     )
     await host.set('sidebarAccount', 'deepseek')
     assert.deepEqual(
       host.ctx.settings.describe().find((row) => row.ns === 'codex-provider')?.value,
-      { sidebarAccount: 'deepseek', codexReview: false, searchMode: 'off', imageDetail: 'auto' },
+      {
+        sidebarAccount: 'deepseek',
+        codexReview: false,
+        searchMode: 'off',
+        imageDetail: 'auto',
+        quotaRefresh: '5',
+      },
     )
     assert.equal(mounts, 2)
     await host.set('searchMode', 'all')
@@ -170,6 +189,7 @@ test('sidebar preference persists through host settings without remounting autho
     await host.set('searchMode', 'all')
     await host.ctx.settings.update('web', { searchProvider: 'user-choice' })
     await host.set('imageDetail', 'original')
+    await host.set('quotaRefresh', '15')
     await host.set('searchMode', 'off')
     assert.equal(
       readConfig<{ searchProvider: string }>(host.ctx, 'web').searchProvider,
@@ -178,6 +198,10 @@ test('sidebar preference persists through host settings without remounting autho
     await host.set('searchMode', 'all')
     await host.close()
     host = await start()
+    assert.equal(
+      readConfig<{ quotaRefresh: string }>(host.ctx, 'codex-provider').quotaRefresh,
+      '15',
+    )
     assert.equal(readConfig<{ searchProvider: string }>(host.ctx, 'web').searchProvider, 'chatgpt')
     assert.equal(
       readConfig<{ imageDetail: string }>(host.ctx, 'codex-provider').imageDetail,

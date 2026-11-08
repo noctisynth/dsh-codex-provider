@@ -2,7 +2,12 @@ import type { Context, Fiber, Volatile } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-config-editor'
 import type {} from '@deepseek-ai/dsh-settings'
 import type {} from '@deepseek-ai/dsh-web'
-import type { ImageDetail, SearchMode } from '../shared/features.ts'
+import {
+  type ImageDetail,
+  type QuotaRefreshInterval,
+  quotaRefreshIntervals,
+  type SearchMode,
+} from '../shared/features.ts'
 
 export const searchProviderId = 'chatgpt'
 
@@ -105,12 +110,20 @@ type PreferenceChange =
   | { key: 'codexReview'; value: boolean }
   | { key: 'searchMode'; value: SearchMode }
   | { key: 'imageDetail'; value: ImageDetail }
+  | { key: 'quotaRefresh'; value: QuotaRefreshInterval }
 
 function parsePreference(payload: unknown): PreferenceChange {
   if (!payload || typeof payload !== 'object' || !('key' in payload) || !('value' in payload))
     throw new Error('Invalid settings parameters.')
   const { key, value } = payload
   switch (key) {
+    case 'quotaRefresh':
+      if (
+        typeof value === 'string' &&
+        quotaRefreshIntervals.includes(value as QuotaRefreshInterval)
+      )
+        return { key, value: value as QuotaRefreshInterval }
+      break
     case 'imageDetail':
       if (value === 'auto' || value === 'low' || value === 'high' || value === 'original')
         return { key, value }

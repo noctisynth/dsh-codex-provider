@@ -1,4 +1,16 @@
 export default {
+  Weekly: 'Weekly',
+  'Resets soon': 'Resets soon',
+  'Resets in {days}d {hours}h': 'Resets in {days}d {hours}h',
+  'Resets in {hours}h {minutes}m': 'Resets in {hours}h {minutes}m',
+  'Resets in {minutes}m': 'Resets in {minutes}m',
+  'Usage unavailable': 'Usage unavailable',
+  'Usage refresh': 'Usage refresh',
+  'Every minute': 'Every minute',
+  'Every 5 minutes': 'Every 5 minutes',
+  'Every 15 minutes': 'Every 15 minutes',
+  'Usage is shown only for legacy sign-ins, in account settings and the ChatGPT sidebar. Choose how often it refreshes automatically, or refresh it manually from the account menu.':
+    'Usage is shown only for legacy sign-ins, in account settings and the ChatGPT sidebar. Choose how often it refreshes automatically, or refresh it manually from the account menu.',
   'Subscription usage': 'Subscription usage',
   'Refresh usage': 'Refresh usage',
   Refresh: 'Refresh',

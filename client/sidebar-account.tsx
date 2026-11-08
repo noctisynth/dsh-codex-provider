@@ -5,7 +5,7 @@ import type {
   ConfigForm,
   SettingsLauncherOwnerProps,
 } from '@deepseek-ai/dsh-client-ui-settings/client'
-import { ArrowLeftRight, LogOut, Settings } from 'lucide-react'
+import { ArrowLeftRight, LogOut, RefreshCw, Settings } from 'lucide-react'
 import { useRef, useState } from 'react'
 import type { AccountStatus } from '../shared/account-ui.ts'
 import type { SidebarPreference } from '../shared/sidebar-preference.ts'
@@ -15,6 +15,7 @@ import { localeNamespace } from './locales/index.ts'
 import { LogoutConfirmation } from './logout-confirmation.tsx'
 import { OpenAiLogo } from './openai-logo.tsx'
 import { setPreference } from './preferences.ts'
+import { quotaWindow } from './quota-format.ts'
 import { buttonVariants } from './ui/button.tsx'
 import {
   DropdownMenu,
@@ -24,9 +25,11 @@ import {
   DropdownMenuTrigger,
 } from './ui/dropdown-menu.tsx'
 import { useAccountSettings } from './use-account-settings.ts'
+import { useQuota, useQuotaInterval } from './use-quota.ts'
 
 export function ChatGptLauncher({
   rpc,
+  form,
   wide,
   openSettings,
   settingsShortcut,
@@ -47,6 +50,22 @@ export function ChatGptLauncher({
     (account) => account.id === status.active && account.hasCredentials,
   )
   const label = account?.name || account?.email || 'ChatGPT'
+  const quotaMinutes = useQuotaInterval(form)
+  const {
+    quota,
+    loading,
+    error: quotaError,
+    refresh,
+  } = useQuota(rpc, account?.capabilities.quota ? account.id : undefined, quotaMinutes)
+  const quotaSummary = quota?.windows
+    .filter((window) => window.name === 'Codex')
+    .map((window) => `${quotaWindow(window, t)} ${Math.round(window.remainingPercent)}%`)
+    .join(' · ')
+  const subtitle = quotaSummary
+    ? `${t('Remaining')} ${quotaSummary}`
+    : quotaError
+      ? t('Usage unavailable')
+      : 'ChatGPT'
   const failure = preferenceError || error
   async function restoreDeepSeek() {
     setSaving(true)
@@ -69,7 +88,7 @@ export function ChatGptLauncher({
         <DropdownMenuTrigger
           ref={trigger}
           aria-label={t('{name}, account menu', { name: label })}
-          title={wide ? undefined : `${label} · ChatGPT`}
+          title={wide ? (quotaSummary ? subtitle : undefined) : `${label} · ${subtitle}`}
           className={cn(
             buttonVariants({ variant: 'ghost' }),
             'cp:box-border cp:min-w-0 cp:rounded-[var(--dsw-radius-md)] cp:text-foreground',
@@ -96,7 +115,7 @@ export function ChatGptLauncher({
               </span>
               <span className='cp:block cp:truncate cp:text-xs cp:leading-4 cp:font-normal cp:text-muted-foreground'>
                 {account
-                  ? 'ChatGPT'
+                  ? subtitle
                   : status
                     ? t('Open settings to sign in')
                     : t('Loading accounts')}
@@ -115,6 +134,16 @@ export function ChatGptLauncher({
             return false
           }}
         >
+          {account?.capabilities.quota && (
+            <DropdownMenuItem
+              disabled={loading}
+              closeOnClick={false}
+              onClick={() => void refresh?.()}
+            >
+              <RefreshCw aria-hidden='true' />
+              {t('Refresh usage')}
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem
             aria-keyshortcuts={settingsShortcut?.aria}
             onClick={() => {

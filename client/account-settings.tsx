@@ -16,6 +16,7 @@ import { OpenAiLogo } from './openai-logo.tsx'
 import { Button } from './ui/button.tsx'
 import { Skeleton } from './ui/skeleton.tsx'
 import { useAccountSettings } from './use-account-settings.ts'
+import { useQuotaInterval } from './use-quota.ts'
 
 type Account = AccountStatus['accounts'][number]
 
@@ -37,6 +38,7 @@ export function AccountSettings({
   t: Translate
 }) {
   const { status, busy, notice, error, act } = useAccountSettings(rpc)
+  const quotaMinutes = useQuotaInterval(preference)
   const [logout, setLogout] = useState<Account | null>(null)
   const running = status?.login.running === true
   const accounts = status?.accounts ?? []
@@ -167,7 +169,7 @@ export function AccountSettings({
                 )}
               </div>
               {account.hasCredentials && account.capabilities.quota && (
-                <AccountQuota id={account.id} rpc={rpc} t={t} />
+                <AccountQuota id={account.id} rpc={rpc} t={t} minutes={quotaMinutes} />
               )}
             </div>
           ))}

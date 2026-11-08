@@ -12,6 +12,7 @@
 
 | 事实 | 适用限制 |
 |---|---|
+| DSH 自动压缩的 measure 对完整 surface 计价，不直接采用较小的云端用量；社区隐式云端窗口不能保证阻止本地重复压缩 | 2026-11-08，DSH 0.2.2-rc.1 官方模块 4 个预算场景及社区 3.2.7 的 3 个模式边界离线验证；非真实云端或完整桌面验收，见 EVIDENCE-042 |
 | 社区 3.2.7 云端压缩使用 Responses 自动压缩及持久化加密检查点，保留 DSH 原生压缩，并与切档配置更新互斥 | 2026-11-08 源码及 14 项合成离线测试；未实测社区长对话和净节省，实施仍暂缓，见 EVIDENCE-041 |
 | DSH 的 GenerateOptions.sessionId 来自持久化会话身份；所测 SIWC 与 legacy Responses 接受由该 ID 派生的 prompt_cache_key | 2026-11-08，DSH 0.2.2-rc.1 源码与合成工具闭环验证；临时实例不保证跨重建稳定，缓存收益未量化，见 EVIDENCE-040 |
 | Responses 的普通输入为 input_tokens 减去 cached_tokens 与 cache_write_tokens；configuration_update 可保留请求级推理基线 | 2026-11-08 官方文档核对；所测 legacy 模型声明及三轮更新验证通过，缓存节省未实测，SIWC 不开放；见 EVIDENCE-039 |

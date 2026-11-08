@@ -32,7 +32,7 @@
 ## 与宿主、连接及档位更新的关系
 
 - [社区说明](https://github.com/WSL043/dsh-codex-subscription/blob/main/README.zh-CN.md) 明确保留 DSH 历史及原生压缩，云端模式为实验性且默认关闭。桥接没有替换 DSH 的会话 surface 或原生压缩服务；不能把它描述为关闭宿主压缩后的完整接管。
-- 源码观察：社区云端阈值与宿主默认压力数值相近，但本地计量、宿主自定义策略、切模预检和上下文超限恢复仍各自存在。本次未验证真实宿主下两套触发器的时序，不能承诺不会先触发本地压缩或重复工作。
+- 源码观察：社区云端阈值与宿主默认压力数值相近，但本地计量、宿主自定义策略、切模预检和上下文超限恢复仍各自存在。本轮未验证两套触发器时序；后续源码及正式宿主模块的合成验证由 EVIDENCE-042 维护，确认可能先触发本地压缩或出现重叠工作。
 - 云端桥接只在 chatgpt.com 的 Codex Responses 成功 HTTP 响应上捕获 SSE，明确设置 transport=sse、websocket=false。这是桥接实现边界；[官方 WebSocket 文档](https://developers.openai.com/api/docs/guides/websocket-mode) 也描述服务端自动压缩，并非协议整体不支持 WebSocket。
 - [推理桥接](https://github.com/WSL043/dsh-codex-subscription/blob/main/src/subscription-reasoning.js) 在 cloud 模式下不启用切档缓存更新。[官方推理文档](https://developers.openai.com/api/docs/guides/reasoning#change-reasoning-mid-conversation) 禁止 configuration_update 与自动压缩混用；显式 compaction_trigger 是另一个方案，社区当前云端模式未采用。未来接入需明确模式优先级，不能直接同时附带两种参数。
 - 缓存 key 保持现有路径；prompt_cache_key 本身不能解决压缩后前缀变化。云端压缩控制上下文增长，提示词缓存复用相同前缀，不能由更短请求直接推算套餐净节省。

@@ -28,10 +28,12 @@ test('native route capabilities govern shared search, preferences and local lega
   assert.equal(siwcCapabilities.remoteRevocation, true)
   assert.equal(legacyCapabilities.webSearch, true)
   assert.equal(legacyCapabilities.remoteRevocation, false)
+  assert.equal(siwcCapabilities.quota, false)
+  assert.equal(siwcCapabilities.imageGeneration, false)
+  assert.equal(legacyCapabilities.quota, true)
+  assert.equal(legacyCapabilities.imageGeneration, true)
   for (const capabilities of [siwcCapabilities, legacyCapabilities]) {
     assert.ok(Object.values(capabilities).every((value) => typeof value === 'boolean'))
-    assert.equal(capabilities.quota, false)
-    assert.equal(capabilities.imageGeneration, false)
     assert.equal(capabilities.connectors, false)
   }
 

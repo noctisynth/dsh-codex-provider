@@ -9,6 +9,7 @@ import { mountAccountUi } from './account-ui.ts'
 import { Accounts, accountsKey } from './accounts.ts'
 import { ChatGptAdapter, provider } from './adapter.ts'
 import { mountApproval } from './approval.ts'
+import { imageGenerationAvailable, imageGenerationTool } from './image-generation.ts'
 import { Operations } from './operations.ts'
 import { Preferences } from './preferences.ts'
 import { chatGptSearch } from './web-search.ts'
@@ -59,6 +60,13 @@ export function apply(ctx: Context, config: Config): void {
     if (key === accountsKey) adapter.invalidateCatalog()
   })
   ctx.llm.registerAdapter([provider], adapter)
+  ctx.inject(['tools'], (child) => {
+    child.effect(() =>
+      child.tools.register(imageGenerationTool(accounts, ctx.attachments, operations), {
+        when: () => imageGenerationAvailable(accounts),
+      }),
+    )
+  })
   ctx.inject(['approval', 'permissionPresets', 'tools', 'workingDirectory'], (child) => {
     mountApproval(child, adapter, () => config.codexReview.get())
   })

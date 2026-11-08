@@ -57,6 +57,15 @@ export function mountAccountUi(
     switch (action) {
       case 'status':
         return { ...(await accounts.summary()), login }
+      case 'quota': {
+        const operation = operations.start(signal)
+        try {
+          const record = await accounts.selected(operation.cancellation, selectedId(payload))
+          return await accounts.client.readQuota(record, operation.cancellation)
+        } finally {
+          operation.close()
+        }
+      }
       case 'preference': {
         if (!savePreference) throw new Error('Host settings cannot be edited right now.')
         await savePreference(payload)
@@ -137,7 +146,16 @@ export function mountAccountUi(
   }
 
   ctx.effect(() => () => controller?.abort())
-  for (const action of ['status', 'login', 'answer', 'cancel', 'select', 'logout', 'preference']) {
+  for (const action of [
+    'status',
+    'quota',
+    'login',
+    'answer',
+    'cancel',
+    'select',
+    'logout',
+    'preference',
+  ]) {
     const method = `codex-provider/${action}`
     ctx.effect(() =>
       ctx.connection.fetch.register({

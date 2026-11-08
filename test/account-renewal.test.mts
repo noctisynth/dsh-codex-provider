@@ -113,3 +113,15 @@ test('temporary renewal failures and failed persistence leave stored credentials
   await assert.rejects(accounts.selected(new Cancellation()), (error) => error === cannotSave)
   assert.deepEqual(await readSaved(), before)
 })
+
+test('reading a named account renews that record without changing the active account', async (t) => {
+  const { client, accounts, original, other } = await setup(t)
+  let renewed = ''
+  client.renewSession = async (record) => {
+    renewed = record
+    return { record, account: describeSession(record) }
+  }
+  assert.equal(await accounts.selected(new Cancellation(), describeSession(other).id), other)
+  assert.equal(renewed, other)
+  assert.equal((await accounts.read())?.active, original.client_id)
+})

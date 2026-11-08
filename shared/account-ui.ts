@@ -1,4 +1,4 @@
-import type { AccountInfo } from '../index.cjs'
+import type { AccountInfo, Quota } from '../index.cjs'
 
 export interface LoginPrompt {
   message: string
@@ -33,6 +33,7 @@ export interface AccountStatus {
 
 export interface AccountActions {
   status: AccountStatus
+  quota: Quota
   login: null
   answer: null
   cancel: null

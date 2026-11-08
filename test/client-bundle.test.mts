@@ -85,6 +85,7 @@ test('the shipped settings preserve account actions, host React sharing and styl
   const slots: { name: string; id?: string; key?: string; priority?: number; locale?: string }[] =
     []
   const requests: { method: string; payload: unknown }[] = []
+  let quotaUnavailable = false
   let running = false
   let active: string | undefined
   let accounts: AccountStatus['accounts'] = []
@@ -104,6 +105,23 @@ test('the shipped settings preserve account actions, host React sharing and styl
         })
       }
       if (method.endsWith('/login')) running = true
+      if (method.endsWith('/quota') && quotaUnavailable)
+        return {
+          ok: false,
+          error: { code: 'unavailable', message: 'Quota unavailable', details: {} },
+        }
+      if (method.endsWith('/quota'))
+        return {
+          ok: true,
+          value: {
+            plan: 'pro',
+            windows: [
+              { name: 'Codex', windowSeconds: 18000, remainingPercent: 80, resetsAt: 2000000000 },
+            ],
+            credits: '3.5',
+            unlimitedCredits: false,
+          },
+        }
       return {
         ok: true,
         value: method.endsWith('/status')
@@ -355,6 +373,59 @@ test('the shipped settings preserve account actions, host React sharing and styl
     })
     assert.match(JSON.stringify(view.toJSON()), /重新登录后可用/)
     assert.doesNotMatch(JSON.stringify(view.toJSON()), /当前使用|synthetic-account|注册信息/)
+  } finally {
+    await act(async () => {
+      view?.unmount()
+    })
+  }
+  assert.equal(
+    requests.some((request) => request.method.endsWith('/quota')),
+    false,
+  )
+  const legacy = native.describeSession(
+    JSON.stringify({
+      ...JSON.parse(sessionRecord()),
+      login_method: 'codex-device',
+      client_id: 'app_EMoamEEZ73f0CkXaXp7hrann',
+      account_id: 'synthetic-workspace',
+    }),
+  )
+  accounts = accounts.map((account) => ({
+    ...account,
+    hasCredentials: true,
+    capabilities: legacy.capabilities,
+  }))
+  try {
+    await act(async () => {
+      view = create(createElement(Settings, { rpc, preference, t, embedded: true }))
+    })
+    assert.ok(view)
+    for (const text of ['订阅用量', 'Pro', '80', '3.5', '5 小时额度'])
+      assert.ok(JSON.stringify(view.toJSON()).includes(text))
+    assert.equal(view.root.findByType('progress').props.value, 80)
+    const refresh = view.root
+      .findAllByType('button')
+      .find((button) => button.props['aria-label'] === '刷新用量')
+    assert.ok(refresh)
+    const before = requests.filter((request) => request.method.endsWith('/quota')).length
+    await act(async () => {
+      refresh.props.onClick()
+    })
+    assert.equal(requests.filter((request) => request.method.endsWith('/quota')).length, before + 1)
+    quotaUnavailable = true
+    await act(async () => {
+      refresh.props.onClick()
+    })
+    assert.equal(view.root.findAllByType('progress').length, 0)
+    assert.match(JSON.stringify(view.toJSON()), /暂时无法读取用量/)
+    accounts = accounts.map((account) => ({
+      ...account,
+      capabilities: native.describeSession(sessionRecord()).capabilities,
+    }))
+    await act(async () => {
+      windowEvents.dispatchEvent(new Event('focus'))
+    })
+    assert.equal(view.root.findAllByType('progress').length, 0)
   } finally {
     await act(async () => {
       view?.unmount()

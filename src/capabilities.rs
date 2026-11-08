@@ -26,8 +26,8 @@ impl LoginMethod {
             },
             Self::CodexBrowser | Self::CodexDevice => Capabilities {
                 web_search: true,
-                quota: false,
-                image_generation: false,
+                quota: true,
+                image_generation: true,
                 connectors: false,
                 remote_revocation: false,
             },

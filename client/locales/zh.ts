@@ -1,4 +1,23 @@
 export default {
+  'Subscription usage': '订阅用量',
+  'Refresh usage': '刷新用量',
+  Refresh: '刷新',
+  'Usage is unavailable. Try refreshing.': '暂时无法读取用量，请刷新重试。',
+  'Remaining usage': '剩余额度',
+  Remaining: '剩余',
+  Resets: '重置时间',
+  Credits: '积分',
+  Unlimited: '不限量',
+  'No usage data returned.': '服务未返回用量数据。',
+  '{hours}-hour window': '{hours} 小时额度',
+  '{days}-day window': '{days} 天额度',
+  'Code review': '代码审查',
+  Pro: 'Pro',
+  Plus: 'Plus',
+  Free: 'Free',
+  Business: 'Business',
+  Enterprise: 'Enterprise',
+  Team: 'Team',
   'Built-in web search is not available with this sign-in method.':
     '当前登录方式暂未提供内置网页搜索。',
   'Built-in web search is not available with this sign-in method. Choose an SIWC account to use it.':

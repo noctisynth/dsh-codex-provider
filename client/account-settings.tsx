@@ -7,6 +7,7 @@ import type { AccountStatus } from '../shared/account-ui.ts'
 import { loginMethodLabel } from '../shared/login-methods.ts'
 import type { SidebarPreference } from '../shared/sidebar-preference.ts'
 import { AccountAvatar } from './account-avatar.tsx'
+import { AccountQuota } from './account-quota.tsx'
 import { FeatureSettings } from './feature-settings.tsx'
 import { cn } from './lib/utils.ts'
 import { LoginPanel } from './login-panel.tsx'
@@ -165,6 +166,9 @@ export function AccountSettings({
                   </>
                 )}
               </div>
+              {account.hasCredentials && account.capabilities.quota && (
+                <AccountQuota id={account.id} rpc={rpc} t={t} />
+              )}
             </div>
           ))}
         </div>

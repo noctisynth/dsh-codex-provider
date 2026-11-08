@@ -1,4 +1,23 @@
 export default {
+  'Subscription usage': 'Subscription usage',
+  'Refresh usage': 'Refresh usage',
+  Refresh: 'Refresh',
+  'Usage is unavailable. Try refreshing.': 'Usage is unavailable. Try refreshing.',
+  'Remaining usage': 'Remaining usage',
+  Remaining: 'Remaining',
+  Resets: 'Resets',
+  Credits: 'Credits',
+  Unlimited: 'Unlimited',
+  'No usage data returned.': 'No usage data returned.',
+  '{hours}-hour window': '{hours}-hour window',
+  '{days}-day window': '{days}-day window',
+  'Code review': 'Code review',
+  Pro: 'Pro',
+  Plus: 'Plus',
+  Free: 'Free',
+  Business: 'Business',
+  Enterprise: 'Enterprise',
+  Team: 'Team',
   'Built-in web search is not available with this sign-in method.':
     'Built-in web search is not available with this sign-in method.',
   'Built-in web search is not available with this sign-in method. Choose an SIWC account to use it.':

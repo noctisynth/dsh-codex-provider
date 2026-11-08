@@ -64,7 +64,7 @@ impl Transport {
         Ok(Self { client })
     }
 
-    fn authorized(
+    pub(crate) fn authorized(
         &self,
         session: &Session,
         request: reqwest::RequestBuilder,
@@ -107,7 +107,7 @@ impl Transport {
     }
 }
 
-async fn response_error(response: reqwest::Response) -> Error {
+pub(crate) async fn response_error(response: reqwest::Response) -> Error {
     let status = response.status().as_u16();
     let request_id = response
         .headers()

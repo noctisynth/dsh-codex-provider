@@ -142,6 +142,36 @@ pub struct ChatGptClient {
 
 #[napi]
 impl ChatGptClient {
+    #[napi]
+    pub async fn read_quota(
+        &self,
+        record: String,
+        cancellation: &Cancellation,
+    ) -> napi::Result<crate::Quota> {
+        let session = auth::Session::decode(&record)?;
+        tokio::select! {
+            biased;
+            _ = cancellation.token.cancelled() => Err(Error::Cancelled.into()),
+            result = crate::quota::read(&self.transport, &session) => result.map_err(Into::into),
+        }
+    }
+
+    #[napi]
+    pub async fn generate_image(
+        &self,
+        record: String,
+        request_json: String,
+        maximum_bytes: u32,
+        cancellation: &Cancellation,
+    ) -> napi::Result<napi::bindgen_prelude::Buffer> {
+        let session = auth::Session::decode(&record)?;
+        tokio::select! {
+            biased;
+            _ = cancellation.token.cancelled() => Err(Error::Cancelled.into()),
+            result = crate::image_generation::generate(&self.transport, &session, &request_json, maximum_bytes) => result.map(Into::into).map_err(Into::into),
+        }
+    }
+
     /// Backend-only stream. Always cancel the native handle before cancelling a pending JS reader.
     #[napi]
     pub fn stream_response<'env>(

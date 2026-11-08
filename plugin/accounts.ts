@@ -147,13 +147,13 @@ export class Accounts {
     return outcome
   }
 
-  async selected(cancellation: Cancellation): Promise<string> {
+  async selected(cancellation: Cancellation, accountId?: string): Promise<string> {
     let selected = ''
     let signedOut = false
     await this.credentials.modifyRecord(accountsKey, async (current) => {
       const vault = requiredVault(current)
       const record = vault.accounts.find(
-        (record) => native.describeSession(record).id === vault.active,
+        (record) => native.describeSession(record).id === (accountId ?? vault.active),
       )
       if (!record || !native.describeSession(record).hasCredentials) {
         throw new LlmError('Sign in from Settings → ChatGPT first.', 'AUTH')

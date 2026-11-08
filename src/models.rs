@@ -18,6 +18,8 @@ struct CatalogModel {
     #[serde(default)]
     supported_reasoning_levels: Vec<ReasoningEffort>,
     default_reasoning_level: Option<String>,
+    #[serde(default)]
+    supports_reasoning_effort_updates: bool,
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
@@ -42,6 +44,7 @@ pub(crate) struct Model {
     pub context_window: Option<u32>,
     pub input_modalities: Option<Vec<String>>,
     pub reasoning: Option<Reasoning>,
+    pub supports_reasoning_effort_updates: bool,
 }
 
 pub(crate) fn parse_catalog(json: &[u8]) -> Result<Vec<Model>, Error> {
@@ -71,6 +74,7 @@ pub(crate) fn parse_catalog(json: &[u8]) -> Result<Vec<Model>, Error> {
                 auto_review_model_override: model.auto_review_model_override,
                 context_window: model.context_window,
                 input_modalities: model.input_modalities,
+                supports_reasoning_effort_updates: model.supports_reasoning_effort_updates,
                 reasoning: if model.supported_reasoning_levels.is_empty() {
                     None
                 } else {
@@ -110,6 +114,7 @@ mod tests {
                     context_window: Some(272000),
                     input_modalities: Some(vec!["text".into(), "image".into()]),
                     reasoning: None,
+                    supports_reasoning_effort_updates: false,
                 },
                 Model {
                     id: "first".into(),
@@ -119,6 +124,7 @@ mod tests {
                     context_window: None,
                     input_modalities: None,
                     reasoning: None,
+                    supports_reasoning_effort_updates: false,
                 },
             ]
         );
@@ -205,5 +211,19 @@ mod tests {
     #[test]
     fn standard_api_catalog_is_not_a_subscription_catalog() {
         assert!(parse_catalog(br#"{"data":[]}"#).is_err());
+    }
+
+    #[test]
+    fn reasoning_updates_require_an_explicit_model_declaration() -> Result<(), crate::error::Error>
+    {
+        let models = parse_catalog(br#"{"models":[
+            {"slug":"supported","display_name":"Supported","visibility":"list","supports_reasoning_effort_updates":true},
+            {"slug":"unsupported","display_name":"Unsupported","visibility":"list","supports_reasoning_effort_updates":false},
+            {"slug":"unspecified","display_name":"Unspecified","visibility":"list"}
+        ]}"#)?;
+        assert!(models[0].supports_reasoning_effort_updates);
+        assert!(!models[1].supports_reasoning_effort_updates);
+        assert!(!models[2].supports_reasoning_effort_updates);
+        Ok(())
     }
 }

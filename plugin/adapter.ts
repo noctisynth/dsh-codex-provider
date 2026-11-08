@@ -133,7 +133,7 @@ export class ChatGptAdapter extends LlmAdapter {
     return selected
   }
 
-  async *stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
+  async *stream(options: GenerateOptions<string>): AsyncIterable<StreamChunk> {
     const webSearch = this.searchMode() !== 'off' && options.purpose === undefined
     yield* this.request(options, { webSearch })
   }
@@ -156,14 +156,15 @@ export class ChatGptAdapter extends LlmAdapter {
   }
 
   private async *request(
-    options: GenerateOptions,
+    options: GenerateOptions<string>,
     features: { webSearch: boolean; searchOnly?: boolean },
   ): AsyncIterable<StreamChunk> {
     const operation = this.operations.start(options.signal)
     let reader: ReadableStreamDefaultReader<NativeStreamChunk> | undefined
     try {
       const record = await this.accounts.selected(operation.cancellation)
-      const webSearch = features.webSearch && native.describeSession(record).capabilities.webSearch
+      const capabilities = native.describeSession(record).capabilities
+      const webSearch = features.webSearch && capabilities.webSearch
       if (features.searchOnly && !webSearch)
         throw new WebError(
           'Built-in web search is not available with this sign-in method.',
@@ -183,6 +184,11 @@ export class ChatGptAdapter extends LlmAdapter {
         tools: projected.tools,
         system: options.system,
         reasoningEffort: options.reasoningEffort,
+        cachePreservingReasoning:
+          capabilities.configurationUpdate &&
+          options.purpose === undefined &&
+          (await this.models()).find((model) => model.id === options.model)
+            ?.supportsReasoningEffortUpdates === true,
         imageDetail: this.imageDetail(),
       }
       reader = this.client

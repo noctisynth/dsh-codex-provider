@@ -12,6 +12,7 @@ pub struct Capabilities {
     pub image_generation: bool,
     pub connectors: bool,
     pub remote_revocation: bool,
+    pub configuration_update: bool,
 }
 
 impl LoginMethod {
@@ -23,6 +24,7 @@ impl LoginMethod {
                 image_generation: false,
                 connectors: false,
                 remote_revocation: true,
+                configuration_update: false,
             },
             Self::CodexBrowser | Self::CodexDevice => Capabilities {
                 web_search: true,
@@ -30,6 +32,7 @@ impl LoginMethod {
                 image_generation: true,
                 connectors: false,
                 remote_revocation: false,
+                configuration_update: true,
             },
         }
     }

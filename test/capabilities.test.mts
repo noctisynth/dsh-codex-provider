@@ -32,6 +32,8 @@ test('native route capabilities govern shared search, preferences and local lega
   assert.equal(siwcCapabilities.imageGeneration, false)
   assert.equal(legacyCapabilities.quota, true)
   assert.equal(legacyCapabilities.imageGeneration, true)
+  assert.equal(siwcCapabilities.configurationUpdate, false)
+  assert.equal(legacyCapabilities.configurationUpdate, true)
   for (const capabilities of [siwcCapabilities, legacyCapabilities]) {
     assert.ok(Object.values(capabilities).every((value) => typeof value === 'boolean'))
     assert.equal(capabilities.connectors, false)
@@ -43,8 +45,15 @@ test('native route capabilities govern shared search, preferences and local lega
     selected: async () => current,
   } as unknown as Accounts
   const client = new native.ChatGptClient({})
-  client.listModels = async () => [{ id: 'test', name: 'Test' }]
-  const requests: { webSearch: boolean; searchOnly?: boolean }[] = []
+  client.listModels = async () => [
+    { id: 'test', name: 'Test', supportsReasoningEffortUpdates: true },
+    { id: 'old', name: 'Old', supportsReasoningEffortUpdates: false },
+  ]
+  const requests: {
+    webSearch: boolean
+    searchOnly?: boolean
+    cachePreservingReasoning: boolean
+  }[] = []
   client.streamResponse = (_record, json) => {
     requests.push(JSON.parse(json))
     return new ReadableStream({
@@ -76,6 +85,10 @@ test('native route capabilities govern shared search, preferences and local lega
       }))
         assert.equal(chunk.type, 'finish')
       assert.equal(requests.at(-1)?.webSearch, supported)
+      assert.equal(
+        requests.at(-1)?.cachePreservingReasoning,
+        native.describeSession(record).capabilities.configurationUpdate,
+      )
       const before = requests.length
       assert.equal(await search.ready(undefined), true)
       assert.equal(requests.length, before)
@@ -85,15 +98,16 @@ test('native route capabilities govern shared search, preferences and local lega
       assert.equal(requests.length, before + 1)
       assert.equal(requests.at(-1)?.webSearch, true)
       assert.equal(requests.at(-1)?.searchOnly, true)
+      assert.equal(requests.at(-1)?.cachePreservingReasoning, false)
     }
     current = JSON.stringify({ ...JSON.parse(siwc), scopes: [] })
     assert.equal(await search.ready(undefined), false)
     current = JSON.stringify({ ...JSON.parse(device), access_token: '', refresh_token: '' })
     assert.equal(await search.ready(undefined), false)
     current = browser
-    for (const purpose of [undefined, 'auto-review'] as const) {
+    for (const purpose of [undefined, 'auto-review', 'compaction', 'title'] as const) {
       searchMode = purpose ? 'all' : 'off'
-      for await (const chunk of ctx.llm.stream({
+      for await (const chunk of adapter.stream({
         provider: 'openai-codex',
         model: 'test',
         purpose,
@@ -101,7 +115,16 @@ test('native route capabilities govern shared search, preferences and local lega
       }))
         assert.equal(chunk.type, 'finish')
       assert.equal(requests.at(-1)?.webSearch, false)
+      assert.equal(requests.at(-1)?.cachePreservingReasoning, purpose === undefined)
     }
+    for await (const _ of adapter.stream({
+      provider: 'openai-codex',
+      model: 'old',
+      messages: [{ role: 'user', content: [{ type: 'text', text: 'Hello' }] }],
+    })) {
+      /* consume */
+    }
+    assert.equal(requests.at(-1)?.cachePreservingReasoning, false)
     const rawClient = new native.ChatGptClient({})
     const result = await rawClient.logoutSession(device, new native.Cancellation())
     assert.equal(result.localOnly, true)

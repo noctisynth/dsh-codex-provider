@@ -15,7 +15,7 @@ test('native provider facts survive the adapter and real DSH failure normalizati
   await llm.await()
   const client = new ChatGptClient({})
   const operations = new Operations()
-  const accounts = { selected: async () => 'not-used-by-synthetic-stream' } as unknown as Accounts
+  const accounts = { selected: async () => sessionRecord() } as unknown as Accounts
   const adapter = new ChatGptAdapter(client, accounts, operations)
   adapter.listModels = async () => [{ id: 'fixture', name: 'Fixture', provider: 'openai-codex' }]
   const registration = ctx.llm.registerAdapter(['openai-codex'], adapter)

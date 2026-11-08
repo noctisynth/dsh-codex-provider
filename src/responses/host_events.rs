@@ -2,6 +2,7 @@ use serde_json::{Value, json};
 use std::collections::BTreeMap;
 
 use super::host_request::REPLAY_FORMAT;
+use super::reasoning_cache::Pending;
 use crate::error::Error;
 
 struct Block {
@@ -18,6 +19,7 @@ struct Block {
 pub(super) struct Mapper {
     blocks: Vec<Block>,
     output: BTreeMap<u64, Value>,
+    reasoning_cache: Option<Pending>,
 }
 
 fn required<'a>(value: &'a Value, key: &str) -> Result<&'a str, Error> {
@@ -63,6 +65,13 @@ fn with_citations(text: &str, content: &Value) -> String {
 }
 
 impl Mapper {
+    pub(super) fn new(reasoning_cache: Option<Pending>) -> Self {
+        Self {
+            reasoning_cache,
+            ..Self::default()
+        }
+    }
+
     fn block(
         &mut self,
         id: &str,
@@ -251,8 +260,12 @@ impl Mapper {
                     let cached = usage["input_tokens_details"]["cached_tokens"]
                         .as_u64()
                         .unwrap_or(0);
+                    let written = usage["input_tokens_details"]["cache_write_tokens"]
+                        .as_u64()
+                        .unwrap_or(0);
                     out.push(json!({"type":"usage","usage":{
-                        "inputTokens":input.saturating_sub(cached),"cacheReadTokens":cached,"outputTokens":output,
+                        "inputTokens":input.saturating_sub(cached).saturating_sub(written),
+                        "cacheReadTokens":cached,"cacheWriteTokens":written,"outputTokens":output,
                         "totalTokens":input+output,"reasoningTokens":usage["output_tokens_details"]["reasoning_tokens"].as_u64().unwrap_or(0)
                     }}));
                 }
@@ -261,9 +274,13 @@ impl Mapper {
                 } else {
                     "stop"
                 };
-                out.push(json!({"type":"finish","reason":{"kind":reason},"replayState":{
+                let mut replay = json!({
                     "response":{"format":REPLAY_FORMAT,"trailing":pending},"blocks":replay_blocks
-                }}));
+                });
+                if let Some(cache) = self.reasoning_cache.take() {
+                    replay["response"]["reasoningCache"] = cache.complete(&output)?;
+                }
+                out.push(json!({"type":"finish","reason":{"kind":reason},"replayState":replay}));
             }
             _ => {}
         }
@@ -357,8 +374,37 @@ mod tests {
         }}))?;
         assert_eq!(chunks[0]["block"]["arguments"], "{}");
         assert_eq!(chunks[1]["usage"]["inputTokens"], 6);
+        assert_eq!(chunks[1]["usage"]["cacheWriteTokens"], 0);
+        assert_eq!(chunks[1]["usage"]["totalTokens"], 13);
         assert_eq!(chunks[2]["reason"]["kind"], "tool-calls");
         assert_eq!(chunks[2]["replayState"]["blocks"][0]["items"][0], reasoning);
+        Ok(())
+    }
+
+    #[test]
+    fn cache_writes_are_disjoint_from_reads_and_ordinary_input() -> Result<(), Error> {
+        let chunks = Mapper::default().accept(json!({"type":"response.completed","response":{
+            "output":[],"usage":{
+                "input_tokens":12000,"input_tokens_details":{
+                    "cached_tokens":4000,"cache_write_tokens":7000,
+                    "cache_write_tokens_details":{"ttl_30m_tokens":3000,"ttl_12h_tokens":4000}
+                },"output_tokens":300,"output_tokens_details":{"reasoning_tokens":200}
+            }
+        }}))?;
+        let usage = &chunks[0]["usage"];
+        assert_eq!(usage["inputTokens"], 1000);
+        assert_eq!(usage["cacheReadTokens"], 4000);
+        assert_eq!(usage["cacheWriteTokens"], 7000);
+        assert_eq!(usage["outputTokens"], 300);
+        assert_eq!(usage["reasoningTokens"], 200);
+        assert_eq!(usage["totalTokens"], 12300);
+        assert_eq!(
+            usage["inputTokens"].as_u64().unwrap_or_default()
+                + usage["cacheReadTokens"].as_u64().unwrap_or_default()
+                + usage["cacheWriteTokens"].as_u64().unwrap_or_default()
+                + usage["outputTokens"].as_u64().unwrap_or_default(),
+            usage["totalTokens"]
+        );
         Ok(())
     }
 }

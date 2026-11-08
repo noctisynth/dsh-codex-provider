@@ -12,6 +12,7 @@ use crate::{
 
 mod host_events;
 mod host_request;
+mod reasoning_cache;
 pub(crate) use host_request::from_host;
 
 #[derive(Deserialize, Serialize)]
@@ -28,6 +29,8 @@ pub(crate) struct Request {
     reasoning: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     include: Option<Vec<String>>,
+    #[serde(skip)]
+    cache: reasoning_cache::Options,
 }
 
 #[derive(Serialize)]
@@ -41,7 +44,7 @@ pub(crate) struct StreamingRequest<'a> {
 pub(crate) fn stream(
     transport: Transport,
     session: Session,
-    request: Request,
+    mut request: Request,
     cancel: CancellationToken,
 ) -> BoxStream<'static, Result<Value, Error>> {
     Box::pin(async_stream::try_stream! {
@@ -54,6 +57,9 @@ pub(crate) fn stream(
         {
             Err(Error::Protocol("Built-in web search is not available with this sign-in method."))?;
         }
+        let cache = reasoning_cache::prepare(
+            &mut request, &session.key(), session.login_method.capabilities().configuration_update,
+        )?;
         let response = tokio::select! {
             _ = cancel.cancelled() => Err(Error::Cancelled),
             response = transport.response(&session, &request) => response,
@@ -61,7 +67,7 @@ pub(crate) fn stream(
         let source = response.bytes_stream().eventsource()
             .map_err(|_| Error::Protocol("Invalid or interrupted OpenAI event stream")).boxed();
         let mut events = decode(source, cancel);
-        let mut mapper = host_events::Mapper::default();
+        let mut mapper = host_events::Mapper::new(cache);
         while let Some(event) = events.next().await {
             for chunk in mapper.accept(event?)? { yield chunk; }
         }

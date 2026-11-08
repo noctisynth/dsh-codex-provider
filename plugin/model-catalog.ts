@@ -16,6 +16,7 @@ const reasoningEffortNames = new Map([
 export type CatalogEntry = LlmResolvedModelInfo & {
   hidden?: boolean
   autoReviewModelOverride?: string
+  supportsReasoningEffortUpdates?: boolean
 }
 
 export function toHostModel({

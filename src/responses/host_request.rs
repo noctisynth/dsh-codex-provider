@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use serde_json::{Value, json};
 
-use super::Request;
+use super::{Request, reasoning_cache};
 use crate::error::Error;
 
 pub(super) const REPLAY_FORMAT: &str = "dsh-codex-provider/responses";
@@ -20,6 +20,8 @@ struct GenerateOptions {
     web_search: bool,
     #[serde(default)]
     search_only: bool,
+    #[serde(default)]
+    cache_preserving_reasoning: bool,
 }
 
 #[derive(Clone, Copy, Default, Deserialize, serde::Serialize)]
@@ -69,6 +71,7 @@ pub(crate) fn from_host(json: &str) -> Result<Request, Error> {
     let options: GenerateOptions = serde_json::from_str(json)
         .map_err(|_| Error::Protocol("Invalid DSH generation request"))?;
     let mut input = Vec::new();
+    let mut previous_cache = None;
     for message in options.messages {
         if message.role == "tool" {
             let call_id = message
@@ -97,6 +100,7 @@ pub(crate) fn from_host(json: &str) -> Result<Request, Error> {
             .filter(|r| message.role == "assistant" && r["response"]["format"] == REPLAY_FORMAT)
             // Older empty completion snapshots must not suppress the persisted visible blocks.
             .filter(|r| has_replay_items(r));
+        let start = input.len();
         for (index, block) in message.content.iter().enumerate() {
             if let Some(items) = replay.and_then(|r| r["blocks"][index]["items"].as_array()) {
                 input.extend(items.iter().cloned());
@@ -124,6 +128,10 @@ pub(crate) fn from_host(json: &str) -> Result<Request, Error> {
         }
         if let Some(items) = replay.and_then(|r| r["response"]["trailing"].as_array()) {
             input.extend(items.iter().cloned());
+        }
+        if message.role == "assistant" {
+            previous_cache =
+                replay.and_then(|r| reasoning_cache::Candidate::from_replay(r, start, input.len()));
         }
     }
     let mut tools: Vec<_> = options
@@ -153,6 +161,10 @@ pub(crate) fn from_host(json: &str) -> Result<Request, Error> {
         include: options
             .web_search
             .then(|| vec!["web_search_call.action.sources".into()]),
+        cache: reasoning_cache::Options {
+            enabled: options.cache_preserving_reasoning,
+            previous: previous_cache,
+        },
     })
 }
 

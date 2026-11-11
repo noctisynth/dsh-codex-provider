@@ -30,4 +30,12 @@
 
 全量汇总未通过：Semifold 0.3.5 的 status 在 push 事件中输出计划后，因事件缺少 pull_request 字段失败。源码表明该命令在 Actions 环境下直接按 PR 事件解析，不能用于通用 push 校验。因此移除重复的 status 命令，保留官方 version --dry-run 的完整规划及只读检查；该路径不读取 PR 事件，dry-run 不收集远程 changelog 元数据。汇总门禁因上述失败而失败，真实 release job 被阻止，未发布。来源：https://github.com/noctisynth/semifold/blob/semifold-v0.3.5/crates/semifold/src/cli/status.rs ，https://github.com/noctisynth/semifold/blob/semifold-v0.3.5/crates/semifold/src/cli/version.rs
 
-修复后的新运行及 release PR 路线待继续核对，不以首轮四平台成功替代最终全量通过。
+首轮 packages 归档已下载并独立核对五个 npm tarball：根包包含四个对应平台原生库，四个平台包各含一个；名称、版本、repository、OS、CPU 和 Linux glibc 元数据符合配置。此为已通过首轮构建的 0.0.0 安装产物核对，不是实际 registry 发布。
+
+移除 PR 专用 status 后，修复提交为 68e0ffd3ed6d9931c228fdce54ce59a5bed05c55，主分支运行：https://github.com/noctisynth/dsh-codex-provider/actions/runs/42998294665 。版本规划、四目标、完整包集合、汇总及 Semifold 自动化共八个 job 全部成功。版本路线成功创建 release PR，并显式 dispatch release 分支；真实发布步骤按设计未执行。
+
+生成 PR：https://github.com/noctisynth/dsh-codex-provider/pull/1 ，保持 OPEN，未合并。已核对 release 分支 manifest 的实际 npm 名称为 dsh-chatgpt-rs、版本为 0.1.0；diff 仅为工具消费 changeset、生成 changelog 和修改根 manifest。实际版本文件由 Semifold 在远程 release 分支生成，本地未手工消费。
+
+release 分支显式 dispatch 验证：https://github.com/noctisynth/dsh-codex-provider/actions/runs/42999714358 。另一个 PR 事件验证因 GitHub 的 bot PR 安全策略显示 action_required，已在核对其代码范围后批准本次工作流执行，而非批准或合并 PR：https://github.com/noctisynth/dsh-codex-provider/actions/runs/42999716658 。两条运行最终均为 success：版本规划、四个原生目标、完整包集合和汇总全部通过；release job 在非 main push 上按设计跳过，没有递归发包。此处验证的是 Semifold 生成的 0.1.0 分支，未把 workflow dispatch 已受理当作检查成功。
+
+核对时仓库仍未配置 NPM_TOKEN，GitHub Releases 列表为空；主运行中所有 npm 发布准备及真实发布步骤均为 skipped，只执行版本 PR 路线。实际首次发布、平台包与根包 registry 权限和 provenance 尚未验收。

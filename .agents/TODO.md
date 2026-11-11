@@ -2,12 +2,14 @@
 
 编号：TODO-001。更新：2026-11-11。依据：RFC-001、SPEC-001。
 
-- [x] 检查原生与宿主输出链路，完成隔离 release、分层吞吐、独立源 200 delta/s、JS 负载及完成尾延迟实验；本地未复现原生 50/s 上限，真实约四倍差距的根因尚未确定，未读取真实凭据或调用模型、未改安装。依据 EVIDENCE-045。
+- [x] 检查原生与宿主输出链路，完成隔离 release、分层吞吐、独立源 200 delta/s、JS 负载及完成尾延迟实验；本地未复现原生 50/s 上限，第一轮未使用真实凭据或调用模型。依据 EVIDENCE-045。
+- [x] 纳入用户两路线、同 DSH/模型/effort、均未启用 Fast 且跨设备复现的更正；核对安装产物、实际代理 feature 与 TCP 默认值，并按追加授权完成恰四次真实对照。相同合成请求在已安装 native 与 Node 中均约 46–51 tok/s，Accept 改动未产生四倍加速；未运行社区完整 Provider，真实差距根因仍未闭合。未保存正文、写入凭据、改安装或实施推测性修复。依据 EVIDENCE-045。
 
 - [x] 用户确认公开源码并保留 provenance、无 scope 名称 dsh-chatgpt-rs；授权推送质量与 Semifold 自动化发布流程并验证 GitHub 全量检查，不合并 release PR 或实际发布。依据 EVIDENCE-044。
 - [x] 同步分发身份，配置质量、四目标原生及 Semifold 版本 PR/发布依赖链，记录变更集；本地原生、界面、类型格式、Rust 与 Node 测试通过。依据 EVIDENCE-044。
-- [ ] 核对公开仓库边界，推送并在 GitHub 执行完整检查；修复真实失败并记录成功的提交和 run。依据 EVIDENCE-044。
-- [ ] 核对 release PR 路线及预览检查，区分 npm 认证缺项、实际发布和 provenance 尚未验收。依据 EVIDENCE-044。
+- [x] 核对公开仓库边界，推送并在 GitHub 执行完整检查；修复 PR 专用 status 在 push 上的失败，主分支全量通过。依据 EVIDENCE-044。
+- [x] 核对 Semifold 实际生成的 release PR、0.1.0 manifest 及两条全量预览检查，全部通过；未合并、未实际发布。依据 EVIDENCE-044。
+- [ ] 配置有根包及四个平台包权限的 NPM_TOKEN，并在明确发布授权下验收 registry 首次发布及 provenance；当前没有发布 secret。依据 EVIDENCE-044。
 
 - [x] 用户确认 Windows x64 MSVC、macOS arm64/x64、Linux x64 GNU/glibc 四目标范围；只读核对当前 Mac 的本地归档安装、原生 arm64 加载及运行时签名边界，不覆盖安装。依据 EVIDENCE-043。
 - [x] 扩展四目标声明，补齐原生矩阵构建、打包加载与官方完整产物收集，保留 napi-rs 与 Semifold 职责；本地静态验证通过，已记录 changeset。依据 EVIDENCE-043。
@@ -60,7 +62,7 @@
 - [x] 实现 DSH 消息、工具调用、流块及重放资料转换；合成验证依据 EVIDENCE-007。
 - [x] 用户确认真实图片对话、提前停止及输入后恢复正常，依据 EVIDENCE-019、EVIDENCE-020。
 - [ ] 验证持续背压、提前结束后的原生资源释放和卸载取消。
-- [ ] 落地 Semifold 单 npm 发布单元及 napi-rs 平台包流程，验证版本同步、lifecycle 和安装。
+- [ ] 完成 Semifold 单 npm 发布单元与 napi-rs 平台包的真实首次发布、provenance 及安装验收；自动化配置、版本同步与发布前 CI 已通过，依据 EVIDENCE-044。
 - [ ] 实现确定范围内的 Rust 核心与 JS 适配，完成针对性验证与真实宿主集成。
 - [x] 按用户授权备份旧 Codex 凭据、桌面配置及旧安装包，并核对备份内容；不记录敏感数据。
 - [x] 生成 DSH 本地插件产物，完成独立宿主预检，替换旧插件；依据 EVIDENCE-007。

@@ -67,7 +67,7 @@ pub(crate) fn stream(
             response = transport.response(&session, &request) => response,
         }?;
         let source = response.bytes_stream().eventsource()
-            .map_err(|_| Error::Protocol("Invalid or interrupted OpenAI event stream")).boxed();
+            .map_err(Error::from).boxed();
         let mut events = decode(source, cancel);
         let mut mapper = host_events::Mapper::new(cache);
         while let Some(event) = events.next().await {
@@ -188,6 +188,66 @@ mod tests {
             "OpenAI response failed: Context exceeded"
         );
         assert!(event["error"].get("input").is_none());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn body_read_failures_preserve_transport_and_timeout_kinds()
+    -> Result<(), Box<dyn std::error::Error>> {
+        for (kind, expected) in [
+            (std::io::ErrorKind::ConnectionReset, "transport"),
+            (std::io::ErrorKind::TimedOut, "timeout"),
+        ] {
+            let body = reqwest::Body::wrap_stream(futures_util::stream::iter([
+                Ok(
+                    b"data: {\"type\":\"response.output_text.delta\",\"delta\":\"test\"}\n\n"
+                        .as_slice(),
+                ),
+                Err(std::io::Error::new(kind, "synthetic read failure")),
+            ]));
+            let response = reqwest::Response::from(axum::http::Response::new(body));
+            let source = response
+                .bytes_stream()
+                .eventsource()
+                .map_err(Error::from)
+                .boxed();
+            let mut events = decode(source, CancellationToken::new());
+            let delta = events.next().await.ok_or("missing delta")??;
+            assert_eq!(delta["delta"], "test");
+            let error = events
+                .next()
+                .await
+                .ok_or("missing stream failure")?
+                .err()
+                .ok_or("body read must fail")?;
+            assert!(matches!(&error, Error::Network(_)), "{error:?}");
+            let event = error.stream_event();
+            assert_eq!(event["error"]["kind"], expected);
+            assert_eq!(event["error"]["message"], "OpenAI network request failed");
+            assert!(events.next().await.is_none());
+        }
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn invalid_stream_encoding_and_json_remain_protocol_errors()
+    -> Result<(), Box<dyn std::error::Error>> {
+        for body in [b"\xff".as_slice(), b"data: not-json\n\n".as_slice()] {
+            let response = reqwest::Response::from(axum::http::Response::new(body.to_vec()));
+            let source = response
+                .bytes_stream()
+                .eventsource()
+                .map_err(Error::from)
+                .boxed();
+            let error = decode(source, CancellationToken::new())
+                .next()
+                .await
+                .ok_or("missing stream failure")?
+                .err()
+                .ok_or("invalid stream must fail")?;
+            assert!(matches!(error, Error::Protocol(_)));
+            assert_eq!(error.stream_event()["error"]["kind"], "protocol");
+        }
         Ok(())
     }
 

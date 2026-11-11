@@ -91,6 +91,15 @@ impl Error {
     }
 }
 
+impl From<eventsource_stream::EventStreamError<reqwest::Error>> for Error {
+    fn from(error: eventsource_stream::EventStreamError<reqwest::Error>) -> Self {
+        match error {
+            eventsource_stream::EventStreamError::Transport(error) => Self::Network(error),
+            _ => Self::Protocol("Invalid or interrupted OpenAI event stream"),
+        }
+    }
+}
+
 impl From<Error> for napi::Error {
     fn from(error: Error) -> Self {
         Self::from_reason(error.to_string())

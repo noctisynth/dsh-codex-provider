@@ -54,7 +54,7 @@ Fast 使用公开 Responses 的 service_tier，与 reasoning.effort 分开。完
 
 原生请求与宿主转换不发送 SIWC 不支持的 max_output_tokens 和 temperature；DSH 继续负责压缩时机、摘要和预算，不新增压缩实现。
 
-HTTP 错误仅保留状态、标准 error.message/code/param、公开顶层 detail 和请求标识；SSE 失败保留事件中的 message/code/param，不展示整份响应体。原生对象流以内部终止错误事件跨 napi 边界传递这些信息，TS 错误模块将其转换为 DSH LlmError，不将该内部事件交给宿主。按机器码及状态映射上下文、额度、认证、限流、服务端和传输失败，不解析展示文案猜测分类；上下文恢复沿用 DSH 中间件，取消仍遵循既有 AbortSignal 与原生取消路径。
+HTTP 错误仅保留状态、标准 error.message/code/param、公开顶层 detail 和请求标识；SSE 失败保留事件中的 message/code/param，不展示整份响应体。原生对象流以内部终止错误事件跨 napi 边界传递这些信息，TS 错误模块将其转换为 DSH LlmError，不将该内部事件交给宿主。按机器码及状态映射上下文、额度、认证、限流、服务端和传输失败，不解析展示文案猜测分类。SSE 错误转换将 EventStreamError::Transport 中的 reqwest 错误保留为现有 Network 类型，继续按 is_timeout 映射 timeout 或 transport；UTF-8 和 SSE 解析错误仍为 Protocol。不修改原生错误事件结构、TS 分类规则或重连行为。上下文恢复沿用 DSH 中间件，取消仍遵循既有 AbortSignal 与原生取消路径。
 
 刷新使用 OAuth 库的错误码与实际 HTTP 状态区分终止授权失败。明确终止的 4xx 清除不可用令牌并保留注册身份，以既有 LoginResult 返回；宿主先提交凭据事务，再拒绝当前请求并提示重新登录。后续请求不再刷新已清空的令牌。未知、网络、5xx 和其他临时失败保留原记录；提交失败不报告清理成功。不增加返回协议、重试框架或凭据存储。原生及 DSH 集成验证见 EVIDENCE-019。
 

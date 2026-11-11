@@ -47,6 +47,8 @@ test('native provider facts survive the adapter and real DSH failure normalizati
     ],
     [{ kind: 'api', status: 400, message: 'Unsupported service_tier: fast' }, 'PROVIDER_ERROR'],
     [{ kind: 'transport', message: 'Network request failed' }, 'TRANSPORT'],
+    [{ kind: 'timeout', message: 'OpenAI network request failed' }, 'TIMEOUT'],
+    [{ kind: 'protocol', message: 'Invalid or interrupted OpenAI event stream' }, 'PROVIDER_ERROR'],
   ]
   try {
     for (const [error, code] of scenarios) {

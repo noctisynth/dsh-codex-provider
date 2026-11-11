@@ -2,7 +2,14 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { Context } from '@deepseek-ai/cordis'
 import { AttachmentId } from '@deepseek-ai/dsh-attachment'
-import { LlmRuntime, type RequestMessage } from '@deepseek-ai/dsh-llm'
+import {
+  createAssistantMessage,
+  createToolResultMessage,
+  LlmRuntime,
+  offloadedImageText,
+  type RequestMessage,
+  ToolCallId,
+} from '@deepseek-ai/dsh-llm'
 import native from '../index.cjs'
 import type { Accounts } from '../plugin/accounts.ts'
 import { ChatGptAdapter } from '../plugin/adapter.ts'
@@ -11,7 +18,7 @@ import { Operations } from '../plugin/operations.ts'
 import { type ImageDetail, imageDetails } from '../shared/features.ts'
 import { sessionRecord } from './session-fixture.mts'
 
-test('DSH preserves images for vision models and projects text-only and offloaded images without reads', async () => {
+test('DSH preserves user and tool images for vision models, with text-only and offloaded images unread', async () => {
   const ref = {
     attachmentId: AttachmentId('sha256:fixture'),
     mediaType: 'image/png' as const,
@@ -29,6 +36,23 @@ test('DSH preserves images for vision models and projects text-only and offloade
         { type: 'image', attachment: ref, offloaded: true },
       ],
     },
+    createAssistantMessage({
+      source: { provider: 'openai-codex', model: 'vision' },
+      content: [
+        { type: 'tool-call', id: ToolCallId('call-images'), name: 'read_image', arguments: '{}' },
+      ],
+    }),
+    createToolResultMessage({
+      callId: ToolCallId('call-images'),
+      isError: false,
+      content: [
+        { type: 'text', text: 'First image' },
+        { type: 'image', attachment: ref },
+        { type: 'text', text: 'Second image' },
+        { type: 'image', attachment: ref },
+        { type: 'image', attachment: ref, offloaded: true },
+      ],
+    }),
   ]
   const before = JSON.stringify(messages)
   const ctx = new Context()
@@ -52,7 +76,11 @@ test('DSH preserves images for vision models and projects text-only and offloade
     },
   }
   let request: {
-    messages: { content: { type: string; imageUrl?: string }[] }[]
+    messages: {
+      role: string
+      toolCallId?: string
+      content: { type: string; imageUrl?: string }[]
+    }[]
     imageDetail?: ImageDetail
   } = { messages: [] }
   client.streamResponse = (_record, json) => {
@@ -83,21 +111,33 @@ test('DSH preserves images for vision models and projects text-only and offloade
     })) {
       assert.ok(chunk.type === 'finish' && chunk.reason.kind === 'stop')
     }
-    assert.equal(reads, 2)
+    assert.equal(reads, 4)
     assert.equal(request.messages[0].content[1].imageUrl, 'data:image/png;base64,AQID')
     assert.equal(request.messages[0].content[2].imageUrl, 'data:image/png;base64,AQID')
     assert.equal(request.messages[0].content[3].type, 'text')
+    assert.equal(request.messages.length, 3)
+    assert.equal(request.messages[2].role, 'tool')
+    assert.equal(request.messages[2].toolCallId, 'call-images')
+    assert.deepEqual(request.messages[2].content, [
+      { type: 'text', text: 'First image' },
+      { type: 'image', imageUrl: 'data:image/png;base64,AQID' },
+      { type: 'text', text: 'Second image' },
+      { type: 'image', imageUrl: 'data:image/png;base64,AQID' },
+      { type: 'text', text: offloadedImageText(ref) },
+    ])
     assert.equal(request.imageDetail, 'auto')
     for await (const _ of ctx.llm.stream({ provider: 'openai-codex', model: 'text', messages })) {
       /* consume */
     }
-    assert.equal(reads, 2)
+    assert.equal(reads, 4)
     assert.ok(request.messages[0].content.every((block) => block.type === 'text'))
+    assert.ok(request.messages[2].content.every((block) => block.type === 'text'))
+    assert.equal(request.messages[2].toolCallId, 'call-images')
     assert.equal(JSON.stringify(messages), before)
     const abort = new AbortController()
     abort.abort(new Error('cancel image read'))
     await assert.rejects(projectImages(messages, attachments, abort.signal), /cancel image read/)
-    assert.equal(reads, 2)
+    assert.equal(reads, 4)
     await assert.rejects(
       projectImages(messages, {
         readImage: async () => {

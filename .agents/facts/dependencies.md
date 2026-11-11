@@ -1,6 +1,6 @@
 # 依赖与协议事实
 
-编号：FACT-002。更新：2026-11-08。证据：EVIDENCE-002、EVIDENCE-003、EVIDENCE-004；补充来源随事实列出。
+编号：FACT-002。更新：2026-11-12。证据：EVIDENCE-002、EVIDENCE-003、EVIDENCE-004；补充来源随事实列出。
 
 2026-11-07，同一现有 Codex 登录凭据的目录对照表明：诊断时插件所用 client_version=0.0.0 缺少 GPT-6.1 Sol/Terra，改为 0.159.0 或 0.167.0 后服务端返回两项且 visibility=list；省略参数返回 400 必填错误。官方将此参数关联 Codex 目录 schema，原参数误取 Cargo 内部版本；此问题不发生在 SIWC 的公开目录。初轮实验限于目录，后续安装修复及用户桌面对话验收见 EVIDENCE-034。
 
@@ -40,6 +40,8 @@
 2026-11-07，DSH 0.2.2-rc.1 的 approval/request 答复者可返回单次许可；never 策略在分发前拒绝。WebRuntime 支持正式搜索源注册及来源截断，ready 只检查本地凭据，不应请求模型目录。ConfigEditor 的条目 Fiber 包装对象可能引用不等而 uid 相同。公开模型目录中的专用审查模型可隐藏于普通列表。依据 EVIDENCE-023、EVIDENCE-024，不能据此推断任意宿主版本兼容。
 
 2026-11-07 核对：SIWC 允许模型支持的图片输入但不支持 Files 上传；Responses input_image 接受 data URL。DSH 0.2.2-rc.1 附件服务提供校验后的图片读取，宿主按模型能力执行文字占位，offloaded 表示持久卸载决定。来源与实测限制见 EVIDENCE-020。
+
+2026-11-12 核对 OpenAI 官方 Python SDK 的 OpenAPI 生成类型：Responses function_call_output.output 可为字符串或 input_text/input_image/input_file 数组；input_image.image_url 支持 Base64 data URL，detail 支持 auto、low、high、original。DSH 0.2.2-rc.1 的正式工具结果可包含图片块，并以 toolCallId 关联调用。该声明不是两条登录路线的真实服务验收，修复与离线验证边界见 EVIDENCE-047。官方来源：https://github.com/openai/openai-python/blob/main/src/openai/types/responses/response_input_param.py 、https://github.com/openai/openai-python/blob/main/src/openai/types/responses/response_function_call_output_item_list_param.py 、https://github.com/openai/openai-python/blob/main/src/openai/types/responses/response_input_image_content_param.py 。
 
 依据 EVIDENCE-010：目标公开模型目录提供 supported_reasoning_levels 与 default_reasoning_level；DSH 0.2.2-rc.1 通过精确模型解析的 reasoning 元数据提供档位选择和默认值校验。档位与默认值具有模型差异，不从型号猜测。
 

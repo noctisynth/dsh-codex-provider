@@ -21,8 +21,8 @@ export async function projectImages(
         content.push({ type: 'text', text: offloadedImageText(block.attachment) })
         continue
       }
-      if (message.role !== 'user')
-        throw new LlmError('Only user messages support image input.', 'INVALID_REQUEST')
+      if (message.role !== 'user' && message.role !== 'tool')
+        throw new LlmError('Only user and tool messages support image input.', 'INVALID_REQUEST')
       if (!attachments)
         throw new LlmError('DSH attachment service is unavailable.', 'INVALID_REQUEST')
       const image = await attachments.readImage(block.attachment, signal)

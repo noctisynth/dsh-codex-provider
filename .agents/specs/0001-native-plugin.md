@@ -1,6 +1,6 @@
 # Rust 原生插件技术方案
 
-编号：SPEC-001。依据：RFC-001。状态：核心主链路及已确认异常恢复已有验证，发布验收尚未完成。更新：2026-11-11。事实：FACT-002；证据：EVIDENCE-002、EVIDENCE-007、EVIDENCE-019。
+编号：SPEC-001。依据：RFC-001。状态：核心主链路及已确认异常恢复已有验证，发布验收尚未完成。更新：2026-11-12。事实：FACT-002；证据：EVIDENCE-002、EVIDENCE-007、EVIDENCE-019。
 
 ## 组件职责
 
@@ -66,7 +66,7 @@ HTTP 错误仅保留状态、标准 error.message/code/param、公开顶层 deta
 
 拟采用紧凑的连接状态、账号行和主操作层级，替换目前的原生按钮和内联样式；主设置页与插件配置面共用组件。加载、浏览器授权等待、账号选择和错误状态沿用现有后端契约。
 
-模型目录的 input_modalities 映射为宿主支持的 text/image 能力；未声明图片的模型保持文字投影。TS 图片适配模块通过 DSH AttachmentStore.readImage 读取已验证的规范化图片，编码为 data URL；Rust 转换为 Responses input_image，使用 auto detail，保持图文顺序。已经 offloaded 的图片使用宿主文字占位，不读取或重新发送图片。复用附件校验与取消，不自行读取本地路径、上传文件、变换图片或增加配置。工具使用非严格函数 schema，工具参数保持原始字符串。完成事件按宿主内容块关联完整 Responses output 项；后续调用重放保留项，避免重复发送推理摘要。
+模型目录的 input_modalities 映射为宿主支持的 text/image 能力；未声明图片的模型保持文字投影。TS 图片适配模块通过 DSH AttachmentStore.readImage 读取用户或工具消息中已验证的规范化图片，编码为 data URL；Rust 将用户图片转换为 Responses input_image，含图片的工具结果转换为同一 function_call_output.output 下按原顺序排列的 input_text/input_image 数组，保留 call_id 并沿用现有图片精度设置。纯文本工具结果保持既有换行拼接字符串，不将工具图片改写为用户消息。已经 offloaded 的图片使用宿主文字占位，不读取或重新发送图片。复用附件校验与取消，不自行读取本地路径、上传文件、变换图片或增加配置。工具使用非严格函数 schema，工具参数保持原始字符串。完成事件按宿主内容块关联完整 Responses output 项；后续调用重放保留项，避免重复发送推理摘要。
 
 流中的完整输出以带 output_index 的 output_item.done 收集；完成通知可以不重复输出数组，不能因此清空历史。完成通知若携带完整输出则使用该数组，否则按输出索引恢复已完成项，再映射到宿主重放资料。
 

@@ -80,13 +80,39 @@ pub(crate) fn from_host(json: &str) -> Result<Request, Error> {
             let call_id = message
                 .tool_call_id
                 .ok_or(Error::Protocol("DSH tool result omitted its call ID"))?;
-            let output = message
-                .content
-                .iter()
-                .filter(|b| b["type"] == "text")
-                .map(text)
-                .collect::<Vec<_>>()
-                .join("\n");
+            let output = if message.content.iter().any(|block| block["type"] == "image") {
+                let mut content = Vec::new();
+                for block in &message.content {
+                    match block["type"].as_str() {
+                        Some("text") => {
+                            content.push(json!({"type":"input_text","text":text(block)}))
+                        }
+                        Some("image") => {
+                            let url = block["imageUrl"]
+                                .as_str()
+                                .filter(|url| !url.is_empty())
+                                .ok_or(Error::Protocol(
+                                    "DSH image omitted its resolved data URL",
+                                ))?;
+                            content.push(json!({
+                                "type":"input_image", "image_url":url, "detail":options.image_detail
+                            }));
+                        }
+                        _ => {}
+                    }
+                }
+                json!(content)
+            } else {
+                json!(
+                    message
+                        .content
+                        .iter()
+                        .filter(|b| b["type"] == "text")
+                        .map(text)
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                )
+            };
             input.push(json!({"type":"function_call_output","call_id":call_id,"output":output}));
             continue;
         }
@@ -248,17 +274,95 @@ mod tests {
     }
 
     #[test]
+    fn tool_images_preserve_call_content_order_and_followup_history() -> Result<(), Error> {
+        let request = from_host(
+            &json!({"model":"vision","imageDetail":"high","messages":[
+                {"role":"assistant","content":[
+                    {"type":"tool-call","id":"call_images","name":"read_image","arguments":"{}"}
+                ]},
+                {"role":"tool","toolCallId":"call_images","content":[
+                    {"type":"text","text":"First image"},
+                    {"type":"image","imageUrl":"data:image/png;base64,first"},
+                    {"type":"text","text":"Second image"},
+                    {"type":"image","imageUrl":"data:image/jpeg;base64,second"},
+                    {"type":"text","text":"End"}
+                ]},
+                {"role":"assistant","content":[{"type":"text","text":"Different colors"}]},
+                {"role":"user","content":[{"type":"text","text":"Which is red?"}]}
+            ]})
+            .to_string(),
+        )?;
+        assert_eq!(request.input.len(), 4);
+        assert_eq!(request.input[0]["type"], "function_call");
+        assert_eq!(request.input[0]["call_id"], "call_images");
+        assert_eq!(
+            request.input[1],
+            json!({
+                "type":"function_call_output","call_id":"call_images","output":[
+                    {"type":"input_text","text":"First image"},
+                    {"type":"input_image","image_url":"data:image/png;base64,first","detail":"high"},
+                    {"type":"input_text","text":"Second image"},
+                    {"type":"input_image","image_url":"data:image/jpeg;base64,second","detail":"high"},
+                    {"type":"input_text","text":"End"}
+                ]
+            })
+        );
+        assert_eq!(request.input[2]["content"], "Different colors");
+        assert_eq!(request.input[3]["content"], "Which is red?");
+        Ok(())
+    }
+
+    #[test]
+    fn text_only_tool_results_keep_string_outputs() -> Result<(), Error> {
+        for (content, expected) in [
+            (json!([]), ""),
+            (json!([{"type":"text","text":"result"}]), "result"),
+            (
+                json!([{"type":"text","text":"first"},{"type":"text","text":"second"}]),
+                "first\nsecond",
+            ),
+        ] {
+            let request = from_host(
+                &json!({"model":"test","messages":[
+                    {"role":"tool","toolCallId":"call_text","content":content}
+                ]})
+                .to_string(),
+            )?;
+            assert_eq!(request.input[0]["output"], expected);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn images_require_resolved_urls_in_user_and_tool_messages() {
+        for role in ["user", "tool"] {
+            for url in [Value::Null, json!("")] {
+                assert!(from_host(&json!({"model":"vision","messages":[
+                    {"role":role,"toolCallId":"call_image","content":[{"type":"image","imageUrl":url}]}
+                ]}).to_string()).is_err());
+            }
+        }
+    }
+
+    #[test]
     fn image_detail_reaches_every_retained_image_and_rejects_unknown_values() -> Result<(), Error> {
         let mut options = json!({"model":"vision","messages":[
             {"role":"user","content":[{"type":"image","imageUrl":"data:image/png;base64,one"}]},
-            {"role":"user","content":[{"type":"image","imageUrl":"data:image/png;base64,two"}]}
+            {"role":"user","content":[{"type":"image","imageUrl":"data:image/png;base64,two"}]},
+            {"role":"tool","toolCallId":"call_image","content":[{"type":"image","imageUrl":"data:image/png;base64,tool"}]}
         ]});
         for detail in ["auto", "low", "high", "original"] {
             options["imageDetail"] = json!(detail);
             let request = from_host(&options.to_string())?;
-            for item in request.input {
+            for item in &request.input[..2] {
                 assert_eq!(item["content"][0]["detail"], detail);
             }
+            assert_eq!(
+                request.input[2]["output"],
+                json!([
+                    {"type":"input_image","image_url":"data:image/png;base64,tool","detail":detail}
+                ])
+            );
         }
         options["imageDetail"] = json!("unsupported");
         assert!(from_host(&options.to_string()).is_err());

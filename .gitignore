@@ -1,5 +1,8 @@
 .inspection/
 node_modules/
+/.pnpm-store/
+/artifacts/
+/*.tgz
 target/
 *.node
 /index.js

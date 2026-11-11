@@ -1,0 +1,102 @@
+name: Native packages
+
+on:
+  push:
+    branches: [main, release]
+    paths-ignore: ['**/*.md']
+  pull_request:
+    paths-ignore: ['**/*.md']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-pc-windows-msvc
+            runner: windows-2022
+            arch: x64
+          - target: aarch64-apple-darwin
+            runner: macos-15
+            arch: arm64
+          - target: x86_64-apple-darwin
+            runner: macos-15-intel
+            arch: x64
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-22.04
+            arch: x64
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.20.0'
+          architecture: ${{ matrix.arch }}
+      - uses: pnpm/action-setup@v6
+        with:
+          cache: true
+      - uses: dtolnay/rust-toolchain@1.98.0
+        with:
+          targets: ${{ matrix.target }}
+          components: rustfmt, clippy
+      - run: pnpm install --frozen-lockfile
+      - name: Build native binding
+        run: pnpm run build:native --target ${{ matrix.target }} -- --locked
+      - name: Build shared host and client
+        run: pnpm run build:js
+      - run: pnpm run check
+      - run: cargo test --locked --lib
+      - name: Test behavior and packed native loading
+        run: pnpm test
+      - uses: actions/upload-artifact@v7
+        with:
+          name: bindings-${{ matrix.target }}
+          path: |
+            dsh-codex-provider.*.node
+            index.cjs
+            index.d.cts
+            lib/
+          if-no-files-found: error
+
+  packages:
+    name: Collect complete four-target package set
+    needs: build
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.20.0'
+      - uses: pnpm/action-setup@v6
+        with:
+          cache: true
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: bindings-*
+          path: artifacts
+      - name: Restore shared generated entrypoints
+        run: |
+          cp artifacts/bindings-x86_64-unknown-linux-gnu/index.cjs index.cjs
+          cp artifacts/bindings-x86_64-unknown-linux-gnu/index.d.cts index.d.cts
+          cp -R artifacts/bindings-x86_64-unknown-linux-gnu/lib lib
+      - run: pnpm run create-npm-dirs
+      - run: pnpm run artifacts
+      - name: Pack root and official platform packages without lifecycle scripts
+        run: |
+          npm pack --ignore-scripts
+          npm pack ./npm/* --ignore-scripts
+      - uses: actions/upload-artifact@v7
+        with:
+          name: packages
+          path: '*.tgz'
+          if-no-files-found: error

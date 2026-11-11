@@ -10,6 +10,12 @@
 - 图片是独立组件的界面示例，账号与额度均为合成资料。未读取真实账号、凭据或私人会话，未调用模型，浏览器进程正常退出。
 - 按用户要求，只保留 README 和 assets 配图，不提供独立 HTML 或 docs 目录。README 使用公开仓库 URL 引用图片，远端展示需对应资源进入仓库。最终分发清单、链接和格式检查结果见本次工具记录。
 
+## 登录方式提示补充
+
+2026-11-12 核对 OpenAI 官方 SIWC Quickstart、开源套餐接入总览及 Models and inference。官方为第三方开源应用提供动态客户端注册和公开 Responses 接入规范，明确要求该流程不使用 ChatGPT backend-api。README 将 SIWC 建议归于 OpenAI 的正式接入指引。过时方式未来可能受限、失效或被判定违规为风险提示，不表示已存在针对本插件的违规判定或已公布的停用日期。现有能力差异继续由能力表说明。
+
+来源：https://developers.openai.com/siwc/quickstart 、https://developers.openai.com/siwc/token-sharing-open-source 、https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference 。
+
 ## 边界
 
 本次检查文档、示例图片和分发清单，不代表新的真实账号或全平台桌面功能验收。未安装插件、推送、更新版本或发布。

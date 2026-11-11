@@ -20,6 +20,8 @@ dsh plugin --profile web add dsh-chatgpt-rs
 
 提供 **继续使用 ChatGPT**（SIWC）、**Codex 浏览器（过时）** 和 **Codex 设备码（过时）** 三种登录方式。
 
+> **OpenAI 建议第三方开源应用使用 [SIWC](https://developers.openai.com/siwc/token-sharing-open-source)**。本插件的 Codex 过时登录不符合该接入规范，未来可能因 OpenAI 政策或接口调整而受限、失效甚至被判定为违规。SIWC 当前能力相对有限，差异见下表。
+
 | 能力 | SIWC | Codex 浏览器／设备码（过时） |
 | --- | --- | --- |
 | 模型对话与推理强度选择 | 支持 | 支持 |

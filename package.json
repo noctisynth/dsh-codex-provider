@@ -20,6 +20,7 @@
   },
   "files": [
     "lib",
+    "assets",
     "cordis.patch.yml",
     "index.cjs",
     "index.d.cts",

@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "ChatGPT Rust",
+    "description": "在 DSH 中使用 ChatGPT 账号，支持模型对话、图片输入和网页搜索。"
+  }
+}

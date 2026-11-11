@@ -1,7 +1,7 @@
 {
   "name": "dsh-chatgpt-rs",
   "version": "0.0.0",
-  "description": "DSH provider for the official ChatGPT open-source app protocol",
+  "description": "Use your ChatGPT account for model conversations, image input, and web search in DSH.",
   "license": "UNLICENSED",
   "repository": {
     "type": "git",
@@ -16,11 +16,15 @@
   "exports": {
     ".": "./lib/index.mjs",
     "./client": "./lib/client.js",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
   },
   "files": [
     "lib",
     "assets",
+    "locale/*.json",
+    "icon.svg",
     "cordis.patch.yml",
     "index.cjs",
     "index.d.cts",

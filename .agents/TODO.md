@@ -2,6 +2,13 @@
 
 编号：TODO-001。更新：2026-11-11。依据：RFC-001、SPEC-001。
 
+- [x] 检查原生与宿主输出链路，完成隔离 release、分层吞吐、独立源 200 delta/s、JS 负载及完成尾延迟实验；本地未复现原生 50/s 上限，真实约四倍差距的根因尚未确定，未读取真实凭据或调用模型、未改安装。依据 EVIDENCE-045。
+
+- [x] 用户确认公开源码并保留 provenance、无 scope 名称 dsh-chatgpt-rs；授权推送质量与 Semifold 自动化发布流程并验证 GitHub 全量检查，不合并 release PR 或实际发布。依据 EVIDENCE-044。
+- [x] 同步分发身份，配置质量、四目标原生及 Semifold 版本 PR/发布依赖链，记录变更集；本地原生、界面、类型格式、Rust 与 Node 测试通过。依据 EVIDENCE-044。
+- [ ] 核对公开仓库边界，推送并在 GitHub 执行完整检查；修复真实失败并记录成功的提交和 run。依据 EVIDENCE-044。
+- [ ] 核对 release PR 路线及预览检查，区分 npm 认证缺项、实际发布和 provenance 尚未验收。依据 EVIDENCE-044。
+
 - [x] 用户确认 Windows x64 MSVC、macOS arm64/x64、Linux x64 GNU/glibc 四目标范围；只读核对当前 Mac 的本地归档安装、原生 arm64 加载及运行时签名边界，不覆盖安装。依据 EVIDENCE-043。
 - [x] 扩展四目标声明，补齐原生矩阵构建、打包加载与官方完整产物收集，保留 napi-rs 与 Semifold 职责；本地静态验证通过，已记录 changeset。依据 EVIDENCE-043。
 - [x] 完成当前 macOS arm64 的构建、类型与格式、Rust/Node 测试及打包产物离线加载，分别记录结果。依据 EVIDENCE-043。

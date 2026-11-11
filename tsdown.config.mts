@@ -35,7 +35,7 @@ export default defineConfig([
     outputOptions: {
       codeSplitting: false,
       entryFileNames: 'client.js',
-      banner: 'window.__ModuleLoader__.load({ id: "dsh-codex-provider", factory: (require) => {',
+      banner: 'window.__ModuleLoader__.load({ id: "dsh-chatgpt-rs", factory: (require) => {',
       intro: 'var module = { exports: {} }; var exports = module.exports;',
       footer: 'return module.exports; } });',
     },

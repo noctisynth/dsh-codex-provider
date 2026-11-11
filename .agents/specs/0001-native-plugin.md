@@ -4,6 +4,8 @@
 
 ## 组件职责
 
+原生性能诊断按 HTTP/SSE、JSON 与宿主事件映射、N-API 对象流、宿主消费及统计口径分层。使用隔离源码副本与合成会话、本地独立线程 SSE 源，保持实际解析、映射与绑定实现，分别测量 Rust 内消费、纯桥接和完整 JS 交付；固定速率与完成尾延迟分开验证。不为诊断新增产品接口、后台队列或用户配置；真实 TLS、代理、服务等级与完整宿主背压的结论须有对应实测。证据及限制由 EVIDENCE-045 维护。
+
 社区云端压缩实现调研由 EVIDENCE-041 维护，预算与触发时序、重复压缩及模式互斥协调由 EVIDENCE-042 维护；候选接入需独立评估原生事件、持久重放和宿主预算，当前不更改既有 DSH 压缩职责或开放新能力。
 
 宿主适配只透传正式 GenerateOptions.sessionId，由 Rust 将非空会话 ID 的 SHA-256 摘要编码为无填充 Base64URL，作为固定 43 字符的 prompt_cache_key；不依赖账号令牌、模型、档位、请求次数或进程随机量。缺少或空 ID 时省略字段，保留原有 SSE、store=false 和完整历史重放。该字段只作为请求元数据，不加入模型输入、配置或持久化重放副本；不改变档位更新检查点的内容校验。真实支持与验证边界由 EVIDENCE-040 维护。
@@ -180,7 +182,7 @@ DSH 适配提供宿主 attributionHeaders，由共享 HTTP 客户端发送；账
 
 四目标 CI 在对应 OS 与原生架构分别构建、执行现有离线测试并验证打包后的原生加载；Windows 使用 MSVC，Linux 使用 GNU/glibc。runner 固定 Windows Server 2022、macOS 15 arm64、macOS 15 Intel、Ubuntu 22.04，避免 latest 标签迁移改变架构；这些是验证环境，不是未实测旧系统的兼容承诺。Linux 产物按实际 runner 的 glibc 边界记录，不承诺更低版本。
 
-所有目标成功后，由 napi-rs 创建平台包并收集原生产物。锁定的 CLI 3.10.12 已在 artifacts 阶段拒绝缺失、重复或未声明的目标，在 pre-publish 的真实发布前校验全部平台包并统一版本；直接复用这些职责，不另写重复的完整性检查或平台元数据生成。通过官方收集后，既有 napi-rs pre-publish 发布平台包，最后由 Semifold 发布根包；不增加第二套版本或发布编排。CI 仅构建、测试和归档，不自动发布、变更版本或创建 GitHub Release。原生文件沿用根包白名单，供离线本地安装；官方平台包保持独立产物。每个目标测试从根归档解包加载，并验证无根二进制时的官方平台包目录解析；最终聚合平台归档的实际安装验收仍需独立证据。
+所有目标成功后，由 napi-rs 创建平台包并收集原生产物。锁定的 CLI 3.10.12 已在 artifacts 阶段拒绝缺失、重复或未声明的目标，在 pre-publish 的真实发布前校验全部平台包并统一版本；直接复用这些职责，不另写重复的完整性检查或平台元数据生成。通过官方收集后，既有 napi-rs pre-publish 发布平台包，最后由 Semifold 发布根包；不增加第二套版本或发布编排。可复用的原生工作流仅构建、测试和归档，不直接发布、变更版本或创建 GitHub Release；新的顶层 CI 依照下述 Semifold 编排协调发布。原生文件沿用根包白名单，供离线本地安装；官方平台包保持独立产物。每个目标测试从根归档解包加载，并验证无根二进制时的官方平台包目录解析；最终聚合平台归档的实际安装验收仍需独立证据。
 
 macOS 独立 Node 与桌面 Electron 进程须分别判断签名与加载权限。只验证现有运行时，不修改签名、不关闭系统安全机制；独立 Node 的加载失败不直接等同桌面宿主失败。安装观察、工具来源与实际测试结果由 EVIDENCE-043 维护。
 
@@ -188,7 +190,15 @@ Semifold 管理 changeset、根 npm 版本、release PR 和发布编排。一个
 
 受控发布步骤先收集并检查所声明平台产物，再调用 napi pre-publish 发布平台包并关闭其 GitHub Release 功能，最后发布根包。GitHub Release 由 Semifold 负责，不再配置第二条平台发布流程。实施时验证 npm lifecycle 与重跑行为，避免重复发布。构建工具版本、Node-API 等级和平台矩阵由目标 DSH 运行时确定。
 
-纯 Agent 上下文修改不创建 changeset。产品成果附 changeset 和本地提交；开发期间不执行公开发布。配置实施及实际发布验证由 TODO-001 跟踪。
+新增顶层质量与发布编排，先执行 Semifold 配置及版本计划的只读检查，再调用四目标原生构建与现有 fmt、全部目标 Clippy、tsrs、Biome、Rust/Node 测试和打包加载。稳定的汇总检查必须依赖所有必要 job 成功，文档及 release PR 同样产生可见检查，不以跳过结果冒充全量通过。
+
+根 npm 名称改为 dsh-chatgpt-rs，平台 npm 名称由官方 napi-rs 按根名派生；原生 binaryName、Rust crate、内部凭据键及业务标识保持不变。Semifold 的稳定 PackageId 保留，既有 changeset 不手工消费；registry 查询及发布使用 manifest 的实际名称。元数据指向真实公开仓库，不另行改 GitHub 仓库名。
+
+固定 Semifold 0.3.5，使用维护方 setup action 的已核对 commit。顶层 main push 且所有检查通过后，在独立最小写权限 job 先运行 ci --dry-run，以 Semifold 自身的 JSON outputs 判断版本或发布分支，不解析提交文案。存在 changeset 时由 ci 创建或更新 release PR；无 changeset 时才装配同一 run、同一提交的完整原生产物，配置 npm 认证后由 ci 发布。npm 认证仅注入真实发布步骤，GitHub Release 仍由 Semifold 负责，napi-rs 禁用自己的 GitHub Release；根包及四个平台包均需要对应的发布权限。
+
+GitHub 权限分离：质量与原生 job 只读，Semifold job 仅持有创建 release 分支、PR、Release 和 provenance 所需权限。由 Actions token 创建 release PR 后，显式 dispatch 同一 CI 到 release 分支，避免依赖 token push 自动触发检查；dispatch 验证不进入真实发布 job。本次以真实 GitHub 运行结果验收质量与版本 PR 路线，npm 初次发布认证及实际 provenance 验收另行跟踪。仓库按用户要求公开，保留现有 --provenance 参数，不通过降低校验掩盖私有源仓库限制。来源、版本与限制由 EVIDENCE-044 维护。
+
+纯 Agent 上下文修改不创建 changeset。产品成果附 changeset 和本地提交；此次允许推送 CI 配置并验证，但不为测试而手工更新版本、合并 release PR 或实际发包。配置实施及实际发布验证由 TODO-001 跟踪。
 
 ## 验证尺度
 

@@ -1,3 +1,3 @@
 - insert:
     - id: codex-provider
-      name: dsh-codex-provider
+      name: dsh-chatgpt-rs

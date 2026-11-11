@@ -73,7 +73,7 @@ test('the shipped settings preserve account actions, host React sharing and styl
     },
   })
   assert.ok(loaded)
-  assert.equal(loaded.id, 'dsh-codex-provider')
+  assert.equal(loaded.id, 'dsh-chatgpt-rs')
   const hostRequire = createRequire(import.meta.url)
   const plugin = loaded.factory(((name: string) => {
     assert.ok(
@@ -217,9 +217,7 @@ test('the shipped settings preserve account actions, host React sharing and styl
     slots.some((entry) => entry.name === 'settings.section.icon' && entry.id === 'codex-provider'),
   )
   assert.ok(
-    slots.some(
-      (entry) => entry.name === 'plugins.bundle.config' && entry.key === 'dsh-codex-provider',
-    ),
+    slots.some((entry) => entry.name === 'plugins.bundle.config' && entry.key === 'dsh-chatgpt-rs'),
   )
   assert.ok(component)
   const Settings = component

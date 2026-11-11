@@ -1,0 +1,135 @@
+name: CI
+
+on:
+  push:
+    branches: [main, release]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'push' || github.ref != 'refs/heads/main' }}
+
+jobs:
+  release-plan:
+    name: Semifold configuration and release plan
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: noctisynth/setup-semifold@9dc3b2e2f25d5db332322b29c3d3436c857ca1d9
+        with:
+          version: '0.3.5'
+      - run: semifold --version
+      - run: semifold status
+      - name: Validate version planning without changing files
+        run: semifold version --dry-run
+      - name: Verify read-only planning
+        run: git diff --exit-code
+
+  native:
+    name: Quality and native packages
+    uses: ./.github/workflows/native.yml
+
+  checks:
+    name: All checks passed
+    if: ${{ always() }}
+    needs: [release-plan, native]
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Require every quality and packaging job
+        env:
+          PLAN_RESULT: ${{ needs.release-plan.result }}
+          NATIVE_RESULT: ${{ needs.native.result }}
+        run: |
+          test "$PLAN_RESULT" = success
+          test "$NATIVE_RESULT" = success
+
+  release:
+    name: Semifold release automation
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    needs: checks
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+      id-token: write
+    concurrency:
+      group: semifold-release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.20.0'
+          registry-url: https://registry.npmjs.org
+      - uses: pnpm/action-setup@v6
+      - uses: noctisynth/setup-semifold@9dc3b2e2f25d5db332322b29c3d3436c857ca1d9
+        with:
+          version: '0.3.5'
+      - name: Determine Semifold version or publish route safely
+        id: plan
+        run: semifold ci --dry-run
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Require npm credentials and public source for a real publish
+        if: ${{ steps.plan.outputs.semifold-publish != '' }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
+        run: |
+          if [ "$REPOSITORY_PRIVATE" != false ]; then
+            echo '::error::npm provenance requires the source repository to be public.'
+            exit 1
+          fi
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo '::error::Configure NPM_TOKEN with publish access to the root package and all four native packages before merging the release PR.'
+            exit 1
+          fi
+      - name: Install publishing tools from the lockfile
+        if: ${{ steps.plan.outputs.semifold-publish != '' }}
+        run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v8
+        if: ${{ steps.plan.outputs.semifold-publish != '' }}
+        with:
+          pattern: bindings-*
+          path: artifacts
+      - name: Restore the tested generated entrypoints
+        if: ${{ steps.plan.outputs.semifold-publish != '' }}
+        run: |
+          cp artifacts/bindings-x86_64-unknown-linux-gnu/index.cjs index.cjs
+          cp artifacts/bindings-x86_64-unknown-linux-gnu/index.d.cts index.d.cts
+          cp -R artifacts/bindings-x86_64-unknown-linux-gnu/lib lib
+      - name: Prepare all native platform packages using napi-rs
+        if: ${{ steps.plan.outputs.semifold-publish != '' }}
+        run: |
+          pnpm run create-npm-dirs
+          pnpm run artifacts
+      - name: Reject unrelated tracked build changes
+        run: git diff --exit-code
+      - name: Create or update the release PR
+        id: version
+        if: ${{ steps.plan.outputs.semifold-version != '' }}
+        run: semifold ci
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Run full checks on the generated release branch
+        if: ${{ steps.version.outputs.semifold-version != '' }}
+        run: gh workflow run ci.yml --ref release
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Publish platform packages, root package and GitHub Release
+        if: ${{ steps.plan.outputs.semifold-publish != '' }}
+        run: semifold ci
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: 'true'

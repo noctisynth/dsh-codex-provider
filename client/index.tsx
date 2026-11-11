@@ -46,7 +46,7 @@ export function apply(ctx: Context): void {
       {
         name: 'plugins.bundle.config',
         locale: localeNamespace,
-        key: 'dsh-codex-provider',
+        key: 'dsh-chatgpt-rs',
         inject: () => ({ rpc, preference, embedded: true }),
       },
       AccountSettings,

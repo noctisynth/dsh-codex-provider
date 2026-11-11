@@ -1,8 +1,16 @@
 {
-  "name": "dsh-codex-provider",
+  "name": "dsh-chatgpt-rs",
   "version": "0.0.0",
   "description": "DSH provider for the official ChatGPT open-source app protocol",
   "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/noctisynth/dsh-codex-provider.git"
+  },
+  "homepage": "https://github.com/noctisynth/dsh-codex-provider",
+  "bugs": {
+    "url": "https://github.com/noctisynth/dsh-codex-provider/issues"
+  },
   "type": "module",
   "main": "lib/index.mjs",
   "exports": {

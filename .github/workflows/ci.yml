@@ -26,7 +26,6 @@ jobs:
         with:
           version: '0.3.5'
       - run: semifold --version
-      - run: semifold status
       - name: Validate version planning without changing files
         run: semifold version --dry-run
       - name: Verify read-only planning

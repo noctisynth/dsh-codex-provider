@@ -21,9 +21,13 @@
 
 - 原生工作流改为可复用调用和手动 dispatch，保留四目标、完整包收集及打包加载测试。顶层 CI 执行 Semifold 只读规划和全部原生质量检查，稳定汇总 job 要求所有依赖成功。没有通过 path 排除跳过文档或 release PR 的检查。
 - 真实 Semifold job 仅在 main push 且全量检查成功后运行。先 dry-run 选路；版本 PR 路线不需要 npm token。只有真实发布路线才检查公开仓库、要求认证并从本次 run 的四目标产物装配官方平台包；不复用旧版本的产物。平台包和根包 npm provenance 保留，GitHub Release 由 Semifold 单独管理。
-- 改名后的 macOS arm64 官方原生与 JS 构建成功；fmt、全部目标及 feature 的 Clippy、两侧 tsrs、Biome 均通过，Rust 44 项和 Node 33 项测试全部通过。本地解析核对了工作流依赖、四目标一致性、分发 key 和保留的 provenance；未把暂存区外的 pnpm/npm 缓存权限问题当作代码失败，批准重试后完成打包测试。未提交工作树下的 Semifold version dry-run 被工具的 clean-tree 前置条件拒绝，需提交后复核，不记为规划成功。
+- 改名后的 macOS arm64 官方原生与 JS 构建成功；fmt、全部目标及 feature 的 Clippy、两侧 tsrs、Biome 均通过，Rust 44 项和 Node 33 项测试全部通过。本地解析核对了工作流依赖、四目标一致性、分发 key 和保留的 provenance；未把暂存区外的 pnpm/npm 缓存权限问题当作代码失败，批准重试后完成打包测试。首次 Semifold version dry-run 被 clean-tree 前置条件拒绝；提交本次成果后，另一个任务的未跟踪调研文档仍存在，保留且未纳入本次提交。随后使用显式 allow-dirty 的只读 dry-run 成功验证 0.0.0 到 0.1.0 的计划，未修改发布文件。远程干净 clone 不依赖此本地选项。
 - GitHub 全量验证、release PR 路线及最终结果以下述真实运行记录为准；本地 YAML 解析与脚本检查不能替代远程执行。实际 npm 发布、provenance 和目标桌面功能验收尚未完成，不能将发布缺凭据导致的阻止视为已发布。
 
 ## GitHub 实际运行
 
-待推送后记录实际提交、run、失败及修复、汇总和四目标结果。此段待验证，不预记成功。
+首轮提交 18bc0b0002b263470d6fb0a43ee1b6c8d7ec8fe6，运行：https://github.com/noctisynth/dsh-codex-provider/actions/runs/42995602713 。四个原生目标的 release 构建、fmt/Clippy/tsrs/Biome、Rust/Node 测试、打包加载和产物上传全部成功；官方完整收集及根包与四个平台包打包成功。
+
+全量汇总未通过：Semifold 0.3.5 的 status 在 push 事件中输出计划后，因事件缺少 pull_request 字段失败。源码表明该命令在 Actions 环境下直接按 PR 事件解析，不能用于通用 push 校验。因此移除重复的 status 命令，保留官方 version --dry-run 的完整规划及只读检查；该路径不读取 PR 事件，dry-run 不收集远程 changelog 元数据。汇总门禁因上述失败而失败，真实 release job 被阻止，未发布。来源：https://github.com/noctisynth/semifold/blob/semifold-v0.3.5/crates/semifold/src/cli/status.rs ，https://github.com/noctisynth/semifold/blob/semifold-v0.3.5/crates/semifold/src/cli/version.rs
+
+修复后的新运行及 release PR 路线待继续核对，不以首轮四平台成功替代最终全量通过。

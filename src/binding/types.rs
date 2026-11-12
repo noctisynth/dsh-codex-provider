@@ -69,6 +69,8 @@ pub struct Model {
     pub input_modalities: Option<Vec<String>>,
     pub reasoning: Option<ModelReasoning>,
     pub supports_reasoning_effort_updates: Option<bool>,
+    pub supports_system_message_updates: Option<bool>,
+    pub supports_additional_tools: Option<bool>,
 }
 
 #[napi(object)]
@@ -94,6 +96,8 @@ impl From<models::Model> for Model {
             context_window: value.context_window,
             input_modalities: value.input_modalities,
             supports_reasoning_effort_updates: Some(value.supports_reasoning_effort_updates),
+            supports_system_message_updates: None,
+            supports_additional_tools: None,
             reasoning: value.reasoning.map(|reasoning| ModelReasoning {
                 default_effort: reasoning.default_effort,
                 efforts: reasoning

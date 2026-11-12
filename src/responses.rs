@@ -32,6 +32,8 @@ pub(crate) struct Request {
     #[serde(skip_serializing_if = "Option::is_none")]
     prompt_cache_key: Option<String>,
     #[serde(skip)]
+    history_updates: bool,
+    #[serde(skip)]
     cache: reasoning_cache::Options,
 }
 
@@ -59,6 +61,9 @@ pub(crate) fn stream(
         if cancel.is_cancelled() { Err(Error::Cancelled)?; }
         if !session.plan_usage_authorized() {
             Err(Error::Auth("ChatGPT plan usage was not authorized"))?;
+        }
+        if request.history_updates && !session.login_method.supports_history_updates() {
+            Err(Error::Protocol("History updates are not available with this sign-in method"))?;
         }
         if !session.login_method.capabilities().web_search
             && request.tools.as_ref().is_some_and(|tools| tools.iter().any(|tool| tool["type"] == "web_search"))

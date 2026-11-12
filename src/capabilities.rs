@@ -16,6 +16,11 @@ pub struct Capabilities {
 }
 
 impl LoginMethod {
+    // Model eligibility comes from its advertised incremental mode, not its name.
+    pub(crate) fn supports_history_updates(self) -> bool {
+        matches!(self, Self::CodexBrowser | Self::CodexDevice)
+    }
+
     pub fn capabilities(self) -> Capabilities {
         match self {
             Self::Siwc => Capabilities {
@@ -35,5 +40,17 @@ impl LoginMethod {
                 configuration_update: true,
             },
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn history_extensions_are_legacy_only() {
+        assert!(!LoginMethod::Siwc.supports_history_updates());
+        assert!(LoginMethod::CodexBrowser.supports_history_updates());
+        assert!(LoginMethod::CodexDevice.supports_history_updates());
     }
 }

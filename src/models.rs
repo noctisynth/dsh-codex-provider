@@ -20,6 +20,8 @@ struct CatalogModel {
     default_reasoning_level: Option<String>,
     #[serde(default)]
     supports_reasoning_effort_updates: bool,
+    #[serde(default)]
+    use_responses_lite: bool,
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
@@ -45,6 +47,7 @@ pub(crate) struct Model {
     pub input_modalities: Option<Vec<String>>,
     pub reasoning: Option<Reasoning>,
     pub supports_reasoning_effort_updates: bool,
+    pub use_responses_lite: bool,
 }
 
 pub(crate) fn parse_catalog(json: &[u8]) -> Result<Vec<Model>, Error> {
@@ -75,6 +78,7 @@ pub(crate) fn parse_catalog(json: &[u8]) -> Result<Vec<Model>, Error> {
                 context_window: model.context_window,
                 input_modalities: model.input_modalities,
                 supports_reasoning_effort_updates: model.supports_reasoning_effort_updates,
+                use_responses_lite: model.use_responses_lite,
                 reasoning: if model.supported_reasoning_levels.is_empty() {
                     None
                 } else {
@@ -115,6 +119,7 @@ mod tests {
                     input_modalities: Some(vec!["text".into(), "image".into()]),
                     reasoning: None,
                     supports_reasoning_effort_updates: false,
+                    use_responses_lite: false,
                 },
                 Model {
                     id: "first".into(),
@@ -125,6 +130,7 @@ mod tests {
                     input_modalities: None,
                     reasoning: None,
                     supports_reasoning_effort_updates: false,
+                    use_responses_lite: false,
                 },
             ]
         );
@@ -211,6 +217,19 @@ mod tests {
     #[test]
     fn standard_api_catalog_is_not_a_subscription_catalog() {
         assert!(parse_catalog(br#"{"data":[]}"#).is_err());
+    }
+
+    #[test]
+    fn incremental_layout_requires_an_explicit_catalog_mode() -> Result<(), crate::error::Error> {
+        let models = parse_catalog(br#"{"models":[
+            {"slug":"future-model","display_name":"Future","visibility":"list","use_responses_lite":true},
+            {"slug":"gpt-6.1-sol","display_name":"Sol","visibility":"list","use_responses_lite":false},
+            {"slug":"missing-mode","display_name":"Missing","visibility":"list"}
+        ]}"#)?;
+        assert!(models[0].use_responses_lite);
+        assert!(!models[1].use_responses_lite);
+        assert!(!models[2].use_responses_lite);
+        Ok(())
     }
 
     #[test]

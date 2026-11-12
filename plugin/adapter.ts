@@ -163,7 +163,14 @@ export class ChatGptAdapter extends LlmAdapter {
     let reader: ReadableStreamDefaultReader<NativeStreamChunk> | undefined
     try {
       const record = await this.accounts.selected(operation.cancellation)
-      const capabilities = native.describeSession(record).capabilities
+      const { capabilities, loginMethod } = native.describeSession(record)
+      const legacy = loginMethod === 'codex-browser' || loginMethod === 'codex-device'
+      const model =
+        options.purpose === undefined && (legacy || capabilities.configurationUpdate)
+          ? (await this.models()).find((model) => model.id === options.model)
+          : undefined
+      const systemPromptUpdate = legacy && model?.supportsSystemMessageUpdates === true
+      const toolUpdates = legacy && model?.supportsAdditionalTools === true
       const webSearch = features.webSearch && capabilities.webSearch
       if (features.searchOnly && !webSearch)
         throw new WebError(
@@ -173,12 +180,14 @@ export class ChatGptAdapter extends LlmAdapter {
       const projected = projectToolUpdates(
         options.messages,
         options.tools,
-        undefined,
+        toolUpdates ? 'addition-only' : undefined,
         options.toolHistory,
       )
       const request = {
         ...features,
         webSearch,
+        systemPromptUpdate,
+        toolUpdates,
         model: options.model,
         sessionId: options.sessionId,
         messages: await projectImages(projected.messages, this.attachments, options.signal),
@@ -186,10 +195,7 @@ export class ChatGptAdapter extends LlmAdapter {
         system: options.system,
         reasoningEffort: options.reasoningEffort,
         cachePreservingReasoning:
-          capabilities.configurationUpdate &&
-          options.purpose === undefined &&
-          (await this.models()).find((model) => model.id === options.model)
-            ?.supportsReasoningEffortUpdates === true,
+          capabilities.configurationUpdate && model?.supportsReasoningEffortUpdates === true,
         imageDetail: this.imageDetail(),
       }
       reader = this.client

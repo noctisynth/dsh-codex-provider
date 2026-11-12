@@ -17,6 +17,8 @@ export type CatalogEntry = LlmResolvedModelInfo & {
   hidden?: boolean
   autoReviewModelOverride?: string
   supportsReasoningEffortUpdates?: boolean
+  supportsSystemMessageUpdates?: boolean
+  supportsAdditionalTools?: boolean
 }
 
 export function toHostModel({
@@ -30,6 +32,8 @@ export function toHostModel({
     ...model,
     inputModalities: inputModalities?.includes('image') ? ['text', 'image'] : ['text'],
   }
+  if (model.supportsSystemMessageUpdates) result.systemPromptUpdate = 'in-history'
+  if (model.supportsAdditionalTools) result.toolUpdate = 'addition-only'
   if (contextWindow !== undefined) result.context = { contextWindow }
   if (reasoning)
     result.reasoning = {

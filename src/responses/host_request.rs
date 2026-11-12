@@ -46,6 +46,10 @@ struct GenerateOptions {
     search_only: bool,
     #[serde(default)]
     cache_preserving_reasoning: bool,
+    #[serde(default)]
+    system_prompt_update: bool,
+    #[serde(default)]
+    tool_updates: bool,
 }
 
 #[derive(Clone, Copy, Default, Deserialize, serde::Serialize)]
@@ -68,10 +72,29 @@ struct Message {
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct Tool {
     name: String,
     description: String,
     parameters: Value,
+    #[serde(default)]
+    defer_loading: bool,
+}
+
+fn function_tool(tool: &Tool) -> Value {
+    json!({
+        "type":"function","name":tool.name,"description":tool.description,
+        "parameters":tool.parameters,"strict":false
+    })
+}
+
+fn application_instructions(content: &str) -> Value {
+    json!({"role":"developer","content":format!(
+        "The following is the complete current DSH application instruction set. \
+         Follow it in place of all earlier DSH application instruction sets, including rules omitted here. \
+         This replaces only DSH application instructions, not OpenAI system rules, \
+         other developer messages, or tool declarations and availability.\n\n{content}"
+    )})
 }
 
 fn text(block: &Value) -> &str {
@@ -102,7 +125,32 @@ pub(crate) fn from_host(json: &str) -> Result<Request, Error> {
         .map_err(|_| Error::Protocol("Invalid DSH generation request"))?;
     let mut input = Vec::new();
     let mut previous_cache = None;
+    let offered_tools = options.tools.unwrap_or_default();
+    let instructions = if options.system_prompt_update {
+        if let Some(system) = &options.system {
+            input.push(json!({"role":"developer","content":system}));
+        }
+        None
+    } else {
+        options.system
+    };
     for message in options.messages {
+        if message.role == "system" && options.system_prompt_update {
+            let content = message
+                .content
+                .iter()
+                .map(|block| {
+                    if block["type"] == "text" {
+                        Ok(text(block))
+                    } else {
+                        Err(Error::Protocol("Unprojected DSH system content block"))
+                    }
+                })
+                .collect::<Result<Vec<_>, Error>>()?
+                .join("\n\n");
+            input.push(application_instructions(&content));
+            continue;
+        }
         if message.role == "tool" {
             let call_id = message
                 .tool_call_id
@@ -181,6 +229,20 @@ pub(crate) fn from_host(json: &str) -> Result<Request, Error> {
                 }
                 match block["type"].as_str() {
                     Some("text") => input.push(json!({"role":message.role,"content":text(block)})),
+                    Some("tool-addition")
+                        if options.tool_updates && message.role == "developer" =>
+                    {
+                        let name = block["toolName"]
+                            .as_str()
+                            .ok_or(Error::Protocol("DSH tool addition omitted its name"))?;
+                        let tool = offered_tools
+                            .iter()
+                            .find(|tool| tool.name == name)
+                            .ok_or(Error::Protocol("DSH tool addition omitted its declaration"))?;
+                        input.push(json!({
+                            "type":"additional_tools","role":"developer","tools":[function_tool(tool)]
+                        }));
+                    }
                     Some("image") if message.role == "user" => {
                         let url = block["imageUrl"]
                             .as_str()
@@ -208,16 +270,10 @@ pub(crate) fn from_host(json: &str) -> Result<Request, Error> {
                 replay.and_then(|r| reasoning_cache::Candidate::from_replay(r, start, input.len()));
         }
     }
-    let mut tools: Vec<_> = options
-        .tools
-        .unwrap_or_default()
-        .into_iter()
-        .map(|t| {
-            json!({
-                "type":"function","name":t.name,"description":t.description,
-                "parameters":t.parameters,"strict":false
-            })
-        })
+    let mut tools: Vec<_> = offered_tools
+        .iter()
+        .filter(|tool| !options.tool_updates || !tool.defer_loading)
+        .map(function_tool)
         .collect();
     if options.web_search {
         tools.push(json!({"type":"web_search"}));
@@ -229,7 +285,7 @@ pub(crate) fn from_host(json: &str) -> Result<Request, Error> {
             .filter(|id| !id.is_empty())
             .map(|id| URL_SAFE_NO_PAD.encode(Sha256::digest(id.as_bytes()))),
         input,
-        instructions: options.system,
+        instructions,
         tools: if tools.is_empty() { None } else { Some(tools) },
         tool_choice: options.search_only.then(|| json!({"type":"web_search"})),
         reasoning: Some(match options.reasoning_effort {
@@ -244,6 +300,7 @@ pub(crate) fn from_host(json: &str) -> Result<Request, Error> {
         } else {
             vec!["reasoning.encrypted_content".into()]
         }),
+        history_updates: options.system_prompt_update || options.tool_updates,
         cache: reasoning_cache::Options {
             enabled: options.cache_preserving_reasoning,
             previous: previous_cache,
@@ -254,6 +311,116 @@ pub(crate) fn from_host(json: &str) -> Result<Request, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn history_updates_append_scoped_instructions_and_native_tools() -> Result<(), Error> {
+        let a = json!({"name":"a","description":"Initial tool","parameters":{"type":"object"}});
+        let b = json!({"name":"b","description":"New tool","parameters":{"type":"object"},"deferLoading":true});
+        let mut options = json!({
+            "model":"catalog-selected-model","system":"Independent static instructions",
+            "systemPromptUpdate":true,"toolUpdates":true,"reasoningEffort":"high",
+            "tools":[a],"messages":[
+                {"role":"system","content":[{"type":"text","text":"First rule"},{"type":"text","text":"Old rule"}]},
+                {"role":"user","content":[{"type":"text","text":"First request"}]}
+            ]
+        });
+        let first = from_host(&options.to_string())?;
+        assert!(first.instructions.is_none());
+        assert_eq!(
+            first.input[0],
+            json!({"role":"developer","content":"Independent static instructions"})
+        );
+        assert_eq!(first.input[1]["role"], "developer");
+        let initial = first.input[1]["content"]
+            .as_str()
+            .ok_or(Error::Protocol("Missing instructions"))?;
+        assert!(initial.contains("complete current DSH application instruction set"));
+        assert!(initial.ends_with("First rule\n\nOld rule"));
+        options["tools"] = json!([a, b]);
+        options["messages"]
+            .as_array_mut()
+            .ok_or(Error::Protocol("Missing history"))?
+            .extend([
+                json!({"role":"assistant","content":[{"type":"text","text":"OK"}]}),
+                json!({"role":"system","content":[{"type":"text","text":"Replacement rule"}]}),
+                json!({"role":"developer","content":[
+                    {"type":"text","text":"Before addition"},
+                    {"type":"tool-addition","toolName":"b"},
+                    {"type":"text","text":"After addition"}
+                ]}),
+                json!({"role":"user","content":[{"type":"text","text":"Follow-up"}]}),
+            ]);
+        let second = from_host(&options.to_string())?;
+        assert_eq!(second.input[..first.input.len()], first.input);
+        assert_eq!(second.tools, first.tools);
+        assert!(
+            second.input[4]["content"]
+                .as_str()
+                .is_some_and(|s| s.ends_with("Replacement rule"))
+        );
+        assert_eq!(second.input[5]["content"], "Before addition");
+        assert_eq!(
+            second.input[6],
+            json!({"type":"additional_tools","role":"developer","tools":[{
+                "type":"function","name":"b","description":"New tool","parameters":{"type":"object"},"strict":false
+            }]})
+        );
+        assert_eq!(second.input[7]["content"], "After addition");
+        let wire = serde_json::to_value(&second).map_err(|_| Error::Protocol("Test JSON"))?;
+        for field in ["history_updates", "systemPromptUpdate", "toolUpdates"] {
+            assert!(wire.get(field).is_none());
+        }
+        assert!(wire["input"][6]["tools"][0].get("defer_loading").is_none());
+        assert!(wire["input"][6]["tools"][0].get("deferLoading").is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn history_update_flags_are_independent_and_additions_require_definitions() -> Result<(), Error>
+    {
+        for (system, tools) in [(false, false), (true, false), (false, true), (true, true)] {
+            let options = json!({"model":"test","system":"Static","systemPromptUpdate":system,
+                "toolUpdates":tools,"tools":[{"name":"b","description":"B","parameters":{},"deferLoading":true}],
+                "messages":[{"role":"system","content":[{"type":"text","text":""}]}]});
+            let request = from_host(&options.to_string())?;
+            assert_eq!(request.instructions.is_none(), system);
+            assert_eq!(request.history_updates, system || tools);
+            assert_eq!(request.tools.is_none(), tools);
+            assert_eq!(
+                request.input.last().map(|item| item["role"].clone()),
+                Some(json!(if system { "developer" } else { "system" }))
+            );
+            if system {
+                assert!(
+                    request
+                        .input
+                        .last()
+                        .and_then(|item| item["content"].as_str())
+                        .is_some_and(|s| s.ends_with("\n\n"))
+                );
+            }
+        }
+        for (enabled, role, block) in [
+            (true, "developer", json!({"type":"tool-addition"})),
+            (
+                true,
+                "developer",
+                json!({"type":"tool-addition","toolName":"missing"}),
+            ),
+            (true, "user", json!({"type":"tool-addition","toolName":"b"})),
+            (
+                false,
+                "developer",
+                json!({"type":"tool-addition","toolName":"b"}),
+            ),
+        ] {
+            let options = json!({"model":"test","toolUpdates":enabled,
+                "tools":[{"name":"b","description":"B","parameters":{}}],
+                "messages":[{"role":role,"content":[block]}]});
+            assert!(from_host(&options.to_string()).is_err());
+        }
+        Ok(())
+    }
 
     #[test]
     fn prompt_cache_key_is_stable_bounded_and_omitted_without_a_session()

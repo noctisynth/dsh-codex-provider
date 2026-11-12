@@ -205,6 +205,85 @@ mod tests {
     }
 
     #[test]
+    fn appended_system_and_tools_keep_checkpoint_and_original_effort_updates() -> Result<(), Error>
+    {
+        let mut options = options();
+        options["systemPromptUpdate"] = json!(true);
+        options["toolUpdates"] = json!(true);
+        let a = json!({"name":"a","description":"A","parameters":{"type":"object"}});
+        let b = json!({"name":"b","description":"B","parameters":{"type":"object"},"deferLoading":true});
+        options["tools"] = json!([a]);
+        options["messages"].as_array_mut().ok_or(Error::Protocol("Missing history"))?.insert(
+            0, json!({"role":"system","content":[{"type":"text","text":"Original application instructions"}]}),
+        );
+        let (first, _) = turn(&mut options, vec![output("m1")])?;
+        options["reasoningEffort"] = json!("high");
+        options["tools"] = json!([a, b]);
+        options["messages"].as_array_mut().ok_or(Error::Protocol("Missing history"))?.extend([
+            json!({"role":"system","content":[{"type":"text","text":"Replacement application instructions"}]}),
+            json!({"role":"developer","content":[{"type":"tool-addition","toolName":"b"}]}),
+        ]);
+        user(&mut options, "Second");
+        let (second, _) = turn(&mut options, vec![output("m2")])?;
+        assert_eq!(second.input[..first.input.len()], first.input);
+        assert_eq!(second.tools, first.tools);
+        assert_eq!(
+            second.reasoning.as_ref().map(|r| &r["effort"]),
+            Some(&json!("low"))
+        );
+        assert_eq!(
+            second
+                .input
+                .iter()
+                .filter(|item| item["type"] == "configuration_update")
+                .count(),
+            1
+        );
+        assert_eq!(
+            second
+                .input
+                .iter()
+                .filter(|item| item["type"] == "additional_tools")
+                .count(),
+            1
+        );
+        let mut restored: Value =
+            serde_json::from_str(&options.to_string()).map_err(|_| Error::Protocol("Test JSON"))?;
+        user(&mut restored, "Third");
+        let (third, _) = turn(&mut restored, vec![output("m3")])?;
+        assert_eq!(third.input[..second.input.len()], second.input);
+        assert_eq!(
+            third
+                .input
+                .iter()
+                .filter(|item| item["type"] == "configuration_update")
+                .count(),
+            1
+        );
+        // Tool removal is a real projection change, not an append-only operation.
+        let mut removed = options.clone();
+        removed["tools"] = json!([a]);
+        removed["messages"]
+            .as_array_mut()
+            .ok_or(Error::Protocol("Missing history"))?
+            .retain(|message| {
+                !message["content"].as_array().is_some_and(|blocks| {
+                    blocks.iter().any(|block| block["type"] == "tool-addition")
+                })
+            });
+        user(&mut removed, "After removal");
+        let (reset, _) = turn(&mut removed, vec![output("m4")])?;
+        assert_eq!(
+            reset.reasoning.as_ref().map(|r| &r["effort"]),
+            Some(&json!("high"))
+        );
+        assert!(!reset.input.iter().any(
+            |item| item["type"] == "configuration_update" || item["type"] == "additional_tools"
+        ));
+        Ok(())
+    }
+
+    #[test]
     fn fixed_high_preserves_prefix_without_updates_even_when_checkpoint_is_missing()
     -> Result<(), Error> {
         let mut options = options();

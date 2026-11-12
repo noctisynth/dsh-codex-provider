@@ -292,6 +292,16 @@ impl ChatGptClient {
             _ = cancellation.token.cancelled() => return Err(Error::Cancelled.into()),
             result = self.transport.models(&session) => result?,
         };
-        Ok(models.into_iter().map(Model::from).collect())
+        Ok(models
+            .into_iter()
+            .map(|model| {
+                let supported =
+                    session.login_method.supports_history_updates() && model.use_responses_lite;
+                let mut model = Model::from(model);
+                model.supports_system_message_updates = Some(supported);
+                model.supports_additional_tools = Some(supported);
+                model
+            })
+            .collect())
     }
 }

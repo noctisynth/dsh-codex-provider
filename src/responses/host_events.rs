@@ -1,7 +1,7 @@
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 
-use super::host_request::REPLAY_FORMAT;
+use super::host_request::{REPLAY_FORMAT_V2, visible_content_digest};
 use super::reasoning_cache::Pending;
 use crate::error::Error;
 
@@ -13,6 +13,48 @@ struct Block {
     call_id: String,
     name: String,
     ended: bool,
+}
+
+impl Block {
+    fn content(&self) -> Value {
+        if self.kind == "tool-call" {
+            json!({"type":"tool-call","id":self.call_id,"name":self.name,"arguments":self.text})
+        } else {
+            json!({"type":self.kind,"text":self.text})
+        }
+    }
+}
+
+// Completion items are final field values, not necessarily complete records.
+// This is deliberately a shallow item merge, not a generic JSON deep merge.
+fn merge_item(previous: &Value, final_item: &Value) -> Result<Value, Error> {
+    let mut merged = previous
+        .as_object()
+        .cloned()
+        .ok_or(Error::Protocol("OpenAI output item is not an object"))?;
+    let final_item = final_item
+        .as_object()
+        .ok_or(Error::Protocol("OpenAI output item is not an object"))?;
+    for key in ["id", "type", "call_id", "name"] {
+        if let (Some(previous), Some(current)) = (merged.get(key), final_item.get(key))
+            && previous != current
+        {
+            return Err(Error::Protocol("OpenAI output item identity conflicts"));
+        }
+    }
+    for (key, value) in final_item {
+        if key == "encrypted_content"
+            && (value.is_null() || value.as_str() == Some(""))
+            && merged
+                .get(key)
+                .and_then(Value::as_str)
+                .is_some_and(|encrypted| !encrypted.is_empty())
+        {
+            continue;
+        }
+        merged.insert(key.clone(), value.clone());
+    }
+    Ok(Value::Object(merged))
 }
 
 #[derive(Default)]
@@ -123,6 +165,11 @@ impl Mapper {
     ) -> Result<(), Error> {
         let block = &self.blocks[index];
         if block.ended {
+            if value.is_some_and(|value| value != block.text) {
+                return Err(Error::Protocol(
+                    "OpenAI final content differs from its closed block",
+                ));
+            }
             return Ok(());
         }
         if let Some(value) = value {
@@ -135,11 +182,7 @@ impl Mapper {
         }
         let block = &mut self.blocks[index];
         block.ended = true;
-        let content = if block.kind == "tool-call" {
-            json!({"type":"tool-call","id":block.call_id,"name":block.name,"arguments":block.text})
-        } else {
-            json!({"type":block.kind,"text":block.text})
-        };
+        let content = block.content();
         out.push(json!({"type":"block-end","index":index,"block":content}));
         Ok(())
     }
@@ -149,6 +192,14 @@ impl Mapper {
         match item["type"].as_str() {
             Some("function_call") => {
                 let index = self.block(id, 0, "tool-call", item, out);
+                let block = &self.blocks[index];
+                if item
+                    .get("call_id")
+                    .is_some_and(|call_id| call_id != &block.call_id)
+                    || item.get("name").is_some_and(|name| name != &block.name)
+                {
+                    return Err(Error::Protocol("OpenAI tool call identity conflicts"));
+                }
                 self.close(index, Some(required(item, "arguments")?), out)?;
             }
             Some("message") | Some("reasoning") => {
@@ -159,6 +210,15 @@ impl Mapper {
                     &item["content"]
                 };
                 if let Some(parts) = parts.as_array() {
+                    if self.blocks.iter().any(|block| {
+                        block.item_id == id
+                            && block.part >= parts.len() as u64
+                            && !block.text.is_empty()
+                    }) {
+                        return Err(Error::Protocol(
+                            "OpenAI final content omitted streamed parts",
+                        ));
+                    }
                     for (part, content) in parts.iter().enumerate() {
                         let text = match content["type"].as_str() {
                             Some("output_text") | Some("summary_text") => {
@@ -187,6 +247,36 @@ impl Mapper {
             _ => return Err(Error::Protocol("Unsupported OpenAI output item")),
         }
         Ok(())
+    }
+
+    fn merged_output(&self, completed: &[Value]) -> Result<Vec<Value>, Error> {
+        let mut output = self.output.clone();
+        let mut completed_indices = Vec::new();
+        for (position, item) in completed.iter().enumerate() {
+            // A sparse completed array can omit done items, so its array position
+            // cannot override the native index of an already identified item.
+            let index = item["id"]
+                .as_str()
+                .and_then(|id| {
+                    output
+                        .iter()
+                        .find(|(_, saved)| saved["id"] == id)
+                        .map(|(index, _)| *index)
+                })
+                .unwrap_or(position as u64);
+            if !completed_indices.contains(&index) {
+                if completed_indices.last().is_some_and(|last| *last > index) {
+                    return Err(Error::Protocol("OpenAI completed output order conflicts"));
+                }
+                completed_indices.push(index);
+            }
+            let merged = match output.get(&index) {
+                Some(previous) => merge_item(previous, item)?,
+                None => item.clone(),
+            };
+            output.insert(index, merged);
+        }
+        Ok(output.into_values().collect())
     }
 
     pub(super) fn accept(&mut self, event: Value) -> Result<Vec<Value>, Error> {
@@ -225,33 +315,33 @@ impl Mapper {
                 self.delta(index, required(&event, "delta")?, &mut out);
             }
             "response.output_item.done" => {
-                self.item_done(&event["item"], &mut out)?;
                 let index = event["output_index"]
                     .as_u64()
                     .ok_or(Error::Protocol("OpenAI output item omitted its index"))?;
-                self.output.insert(index, event["item"].clone());
+                let id = required(&event["item"], "id")?;
+                if self
+                    .output
+                    .iter()
+                    .any(|(saved_index, item)| *saved_index != index && item["id"] == id)
+                {
+                    return Err(Error::Protocol("OpenAI output item index conflicts"));
+                }
+                let item = match self.output.get(&index) {
+                    Some(previous) => merge_item(previous, &event["item"])?,
+                    None => event["item"].clone(),
+                };
+                self.item_done(&item, &mut out)?;
+                self.output.insert(index, item);
             }
             "response.completed" => {
                 let completed_output = event["response"]["output"]
                     .as_array()
                     .ok_or(Error::Protocol("OpenAI completed response omitted output"))?;
-                // Subscription streams can finish with an empty output array after emitting item.done.
-                let output = if completed_output.is_empty() {
-                    self.output.values().cloned().collect::<Vec<_>>()
-                } else {
-                    completed_output.clone()
-                };
+                let output = self.merged_output(completed_output)?;
                 for item in &output {
                     self.item_done(item, &mut out)?;
                 }
-                let mut replay_blocks = vec![json!({"items":[]}); self.blocks.len()];
-                let mut pending = Vec::new();
-                for item in &output {
-                    pending.push(item.clone());
-                    if let Some(index) = self.blocks.iter().position(|b| item["id"] == b.item_id) {
-                        replay_blocks[index] = json!({"items":std::mem::take(&mut pending)});
-                    }
-                }
+                let visible: Vec<_> = self.blocks.iter().map(Block::content).collect();
                 let usage = &event["response"]["usage"];
                 if let (Some(input), Some(output)) = (
                     usage["input_tokens"].as_u64(),
@@ -275,7 +365,10 @@ impl Mapper {
                     "stop"
                 };
                 let mut replay = json!({
-                    "response":{"format":REPLAY_FORMAT,"trailing":pending},"blocks":replay_blocks
+                    "response":{
+                        "format":REPLAY_FORMAT_V2,"items":output,
+                        "contentDigest":visible_content_digest(&visible)?
+                    }
                 });
                 if let Some(cache) = self.reasoning_cache.take() {
                     replay["response"]["reasoningCache"] = cache.complete(&output)?;
@@ -288,9 +381,242 @@ impl Mapper {
     }
 }
 
+// Legacy envelopes have no stored edit digest. Validate only what their saved
+// item order can actually reproduce; this cannot recover their lost global order.
+pub(super) fn replay_content_digest(items: &[Value]) -> Result<String, Error> {
+    let mut mapper = Mapper::default();
+    let mut ignored = Vec::new();
+    for item in items {
+        mapper.item_done(item, &mut ignored)?;
+    }
+    let visible: Vec<_> = mapper.blocks.iter().map(Block::content).collect();
+    visible_content_digest(&visible)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // The host persists blocks in first-seen index order, not block-end order.
+    fn visible_blocks(chunks: &[Value]) -> Vec<Value> {
+        chunks
+            .iter()
+            .filter(|chunk| chunk["type"] == "block-end")
+            .filter_map(|chunk| {
+                chunk["index"]
+                    .as_u64()
+                    .map(|index| (index, chunk["block"].clone()))
+            })
+            .collect::<BTreeMap<_, _>>()
+            .into_values()
+            .collect()
+    }
+
+    #[test]
+    fn sparse_completion_keeps_done_fields_and_nonempty_encryption() -> Result<(), Error> {
+        let reasoning = json!({"id":"r","type":"reasoning","summary":[{"type":"summary_text","text":"Plan"}],"encrypted_content":"done-encrypted","status":"completed"});
+        let call = json!({"id":"f","type":"function_call","call_id":"c","name":"lookup","arguments":"{ \"q\" : 1 }"});
+        for encrypted in [
+            None,
+            Some(Value::Null),
+            Some(json!("")),
+            Some(json!("final-encrypted")),
+        ] {
+            let mut mapper = Mapper::default();
+            let mut chunks = mapper.accept(
+                json!({"type":"response.output_item.done","output_index":0,"item":reasoning}),
+            )?;
+            chunks.extend(mapper.accept(
+                json!({"type":"response.output_item.done","output_index":1,"item":call}),
+            )?);
+            let mut final_reasoning = json!({"id":"r","type":"reasoning"});
+            if let Some(value) = &encrypted {
+                final_reasoning["encrypted_content"] = value.clone();
+            }
+            let final_chunks = mapper.accept(
+                json!({"type":"response.completed","response":{"output":[final_reasoning]}}),
+            )?;
+            assert!(
+                !final_chunks
+                    .iter()
+                    .any(|chunk| chunk["type"] == "block-end")
+            );
+            chunks.extend(final_chunks);
+            let replay = &chunks.last().ok_or(Error::Protocol("Missing finish"))?["replayState"];
+            let mut expected = reasoning.clone();
+            if encrypted == Some(json!("final-encrypted")) {
+                expected["encrypted_content"] = json!("final-encrypted");
+            }
+            assert_eq!(replay["response"]["items"], json!([expected, call]));
+            assert_eq!(replay["response"]["format"], REPLAY_FORMAT_V2);
+            assert!(replay.get("blocks").is_none());
+            assert!(replay["response"].get("trailing").is_none());
+            assert_eq!(
+                replay["response"]["contentDigest"],
+                visible_content_digest(&visible_blocks(&chunks))?
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn completion_enriches_done_and_deduplicates_only_the_same_identity() -> Result<(), Error> {
+        let mut mapper = Mapper::default();
+        let poor = json!({"id":"r","type":"reasoning","summary":[]});
+        mapper.accept(json!({"type":"response.output_item.done","output_index":0,"item":poor}))?;
+        mapper.accept(json!({"type":"response.output_item.done","output_index":0,"item":poor}))?;
+        let rich = json!({"id":"r","type":"reasoning","summary":[],"encrypted_content":"final"});
+        let first = json!({"id":"f1","type":"function_call","call_id":"same-call","name":"lookup","arguments":"{}"});
+        let second = json!({"id":"f2","type":"function_call","call_id":"same-call","name":"lookup","arguments":"{}"});
+        let chunks = mapper.accept(
+            json!({"type":"response.completed","response":{"output":[rich,rich,first,second]}}),
+        )?;
+        assert_eq!(
+            chunks.last().ok_or(Error::Protocol("Missing finish"))?["replayState"]["response"]["items"],
+            json!([rich, first, second])
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn identity_index_order_and_closed_body_conflicts_are_protocol_errors() -> Result<(), Error> {
+        let item = json!({"id":"m","type":"message","role":"assistant","content":[{"type":"output_text","text":"OK"}]});
+        for (index, changed) in [
+            (1, item.clone()),
+            (0, json!({"id":"other","type":"message","content":[]})),
+            (0, json!({"id":"m","type":"reasoning","summary":[]})),
+        ] {
+            let mut mapper = Mapper::default();
+            mapper
+                .accept(json!({"type":"response.output_item.done","output_index":0,"item":item}))?;
+            assert!(matches!(
+                mapper.accept(
+                    json!({"type":"response.output_item.done","output_index":index,"item":changed})
+                ),
+                Err(Error::Protocol(_))
+            ));
+        }
+        for changed in [
+            json!({"id":"other","type":"message","content":[]}),
+            json!({"id":"m","type":"reasoning","summary":[]}),
+            json!({"id":"m","type":"message","content":[]}),
+            json!({"id":"m","type":"message","content":[{"type":"output_text","text":"Different"}]}),
+            json!({"id":"m","type":"message","content":[{"type":"output_text","text":"OK appended"}]}),
+        ] {
+            let mut mapper = Mapper::default();
+            mapper
+                .accept(json!({"type":"response.output_item.done","output_index":0,"item":item}))?;
+            assert!(matches!(
+                mapper.accept(json!({"type":"response.completed","response":{"output":[changed]}})),
+                Err(Error::Protocol(_))
+            ));
+        }
+        let mut mapper = Mapper::default();
+        mapper.accept(json!({"type":"response.output_item.done","output_index":0,"item":item}))?;
+        let search = json!({"id":"s","type":"web_search_call"});
+        mapper
+            .accept(json!({"type":"response.output_item.done","output_index":1,"item":search}))?;
+        assert!(matches!(
+            mapper.accept(json!({"type":"response.completed","response":{"output":[search,item]}})),
+            Err(Error::Protocol(_))
+        ));
+        let call =
+            json!({"id":"f","type":"function_call","call_id":"c","name":"lookup","arguments":"{}"});
+        for event_type in ["response.output_item.added", "response.output_item.done"] {
+            for field in ["call_id", "name"] {
+                let mut mapper = Mapper::default();
+                mapper.accept(json!({"type":event_type,"output_index":0,"item":call}))?;
+                let mut changed = call.clone();
+                changed[field] = json!("different");
+                assert!(matches!(
+                    mapper.accept(
+                        json!({"type":"response.completed","response":{"output":[changed]}})
+                    ),
+                    Err(Error::Protocol(_))
+                ));
+            }
+        }
+        let mut mapper = Mapper::default();
+        let reasoning =
+            json!({"id":"r","type":"reasoning","summary":[{"type":"summary_text","text":"Plan"}]});
+        mapper.accept(
+            json!({"type":"response.output_item.done","output_index":0,"item":reasoning}),
+        )?;
+        assert!(matches!(mapper.accept(json!({"type":"response.completed","response":{"output":[{"id":"r","type":"reasoning","summary":[]}]}})), Err(Error::Protocol(_))));
+        Ok(())
+    }
+
+    #[test]
+    fn response_items_survive_first_seen_order_multiple_parts_and_serialized_restore()
+    -> Result<(), Error> {
+        let mut options = json!({"model":"test","reasoningEffort":"high","cachePreservingReasoning":true,"messages":[{"role":"user","content":[{"type":"text","text":"First"}]}]});
+        let mut first = super::super::from_host(&options.to_string())?;
+        let pending = super::super::reasoning_cache::prepare(&mut first, "account", true)?;
+        let mut mapper = Mapper::new(pending);
+        let reasoning = json!({"id":"r","type":"reasoning","summary":[{"type":"summary_text","text":"Plan"}],"encrypted_content":"opaque"});
+        let search = json!({"id":"s","type":"web_search_call","action":{"type":"search","query":"example","sources":[{"url":"https://example.com/"}]}});
+        let invisible =
+            json!({"id":"hidden","type":"reasoning","summary":[],"encrypted_content":"hidden"});
+        let message = json!({"id":"m","type":"message","role":"assistant","phase":"commentary","content":[{"type":"output_text","text":"One"},{"type":"output_text","text":"Two"}]});
+        let call = json!({"id":"f","type":"function_call","call_id":"c","name":"lookup","arguments":"{ \"q\" : 1 }"});
+        let trailing = json!({"id":"trailing","type":"web_search_call","action":{"type":"open_page","url":"https://example.com/"}});
+        let mut chunks = Vec::new();
+        for event in [
+            json!({"type":"response.output_text.delta","item_id":"m","content_index":1,"delta":"Two"}),
+            json!({"type":"response.output_item.added","item":call}),
+            json!({"type":"response.function_call_arguments.delta","item_id":"f","delta":"{ \"q\" : 1 }"}),
+            json!({"type":"response.reasoning_summary_text.delta","item_id":"r","summary_index":0,"delta":"Plan"}),
+            json!({"type":"response.output_text.delta","item_id":"m","content_index":0,"delta":"One"}),
+        ] {
+            chunks.extend(mapper.accept(event)?);
+        }
+        let output = vec![
+            reasoning.clone(),
+            search.clone(),
+            invisible.clone(),
+            message.clone(),
+            call.clone(),
+            trailing.clone(),
+        ];
+        for index in [4, 3, 0, 1, 2, 5] {
+            chunks.extend(mapper.accept(json!({"type":"response.output_item.done","output_index":index,"item":output[index]}))?);
+        }
+        chunks.extend(mapper.accept(json!({"type":"response.completed","response":{"output":[{"id":"r","type":"reasoning","encrypted_content":null},{"id":"m","type":"message","phase":"final_answer"},{"id":"f","type":"function_call"}]}}))?);
+        let content = visible_blocks(&chunks);
+        assert_eq!(content[0]["text"], "Two");
+        assert_eq!(content[1]["type"], "tool-call");
+        assert_eq!(content[2]["text"], "Plan");
+        assert_eq!(content[3]["text"], "One");
+        let replay = &chunks.last().ok_or(Error::Protocol("Missing finish"))?["replayState"];
+        let mut expected = output;
+        expected[3]["phase"] = json!("final_answer");
+        assert_eq!(replay["response"]["items"], json!(expected));
+        options["messages"]
+            .as_array_mut()
+            .ok_or(Error::Protocol("Missing history"))?
+            .push(json!({"role":"assistant","content":content,"source":{"replayState":replay}}));
+        options =
+            serde_json::from_str(&options.to_string()).map_err(|_| Error::Protocol("Test JSON"))?;
+        let mut restored = super::super::from_host(&options.to_string())?;
+        assert_eq!(restored.input[..first.input.len()], first.input);
+        assert_eq!(restored.input[first.input.len()..], expected);
+        // A real switch proves Pending hashed the same merged items the reader replays.
+        options["reasoningEffort"] = json!("max");
+        restored = super::super::from_host(&options.to_string())?;
+        super::super::reasoning_cache::prepare(&mut restored, "account", true)?;
+        assert_eq!(
+            restored.reasoning.as_ref().map(|r| &r["effort"]),
+            Some(&json!("high"))
+        );
+        assert_eq!(
+            restored
+                .input
+                .last()
+                .map(|item| &item["reasoning"]["effort"]),
+            Some(&json!("max"))
+        );
+        Ok(())
+    }
 
     #[test]
     fn server_search_is_replayed_with_clickable_citations_and_no_client_tool_call()
@@ -319,7 +645,7 @@ mod tests {
         );
         let finish = chunks.last().ok_or(Error::Protocol("Missing finish"))?;
         assert_eq!(finish["reason"]["kind"], "stop");
-        assert_eq!(finish["replayState"]["blocks"][0]["items"][0], search);
+        assert_eq!(finish["replayState"]["response"]["items"][0], search);
         Ok(())
     }
 
@@ -377,7 +703,7 @@ mod tests {
         assert_eq!(chunks[1]["usage"]["cacheWriteTokens"], 0);
         assert_eq!(chunks[1]["usage"]["totalTokens"], 13);
         assert_eq!(chunks[2]["reason"]["kind"], "tool-calls");
-        assert_eq!(chunks[2]["replayState"]["blocks"][0]["items"][0], reasoning);
+        assert_eq!(chunks[2]["replayState"]["response"]["items"][0], reasoning);
         Ok(())
     }
 

@@ -205,6 +205,40 @@ mod tests {
     }
 
     #[test]
+    fn fixed_high_preserves_prefix_without_updates_even_when_checkpoint_is_missing()
+    -> Result<(), Error> {
+        let mut options = options();
+        options["reasoningEffort"] = json!("high");
+        let (first, _) = turn(&mut options, vec![output("m1")])?;
+        user(&mut options, "Second");
+        let (second, _) = turn(&mut options, vec![output("m2")])?;
+        assert_eq!(second.input[..first.input.len()], first.input);
+        for missing_checkpoint in [false, true] {
+            let mut restored: Value = serde_json::from_str(&options.to_string())
+                .map_err(|_| Error::Protocol("Test JSON"))?;
+            if missing_checkpoint {
+                restored["messages"][3]["source"]["replayState"]["response"]["reasoningCache"] =
+                    Value::Null;
+            }
+            user(&mut restored, "Third");
+            let (third, replay) = turn(&mut restored, vec![output("m3")])?;
+            assert_eq!(third.input[..second.input.len()], second.input);
+            assert!(
+                !third
+                    .input
+                    .iter()
+                    .any(|item| item["type"] == "configuration_update")
+            );
+            assert_eq!(
+                third.reasoning.as_ref().map(|r| &r["effort"]),
+                Some(&json!("high"))
+            );
+            assert_eq!(replay["response"]["reasoningCache"]["updates"], json!([]));
+        }
+        Ok(())
+    }
+
+    #[test]
     fn switches_keep_the_baseline_and_original_update_positions_after_reload() -> Result<(), Error>
     {
         let mut options = options();
@@ -300,6 +334,7 @@ mod tests {
             "tools",
             "input",
             "output",
+            "visible-output",
             "compaction",
             "missing-state",
         ] {
@@ -312,8 +347,11 @@ mod tests {
                 }
                 "input" => options["messages"][0]["content"][0]["text"] = json!("Edited"),
                 "output" => {
-                    options["messages"][1]["source"]["replayState"]["blocks"][0]["items"][0]["content"]
+                    options["messages"][1]["source"]["replayState"]["response"]["items"][0]["content"]
                         [0]["text"] = json!("Edited")
+                }
+                "visible-output" => {
+                    options["messages"][1]["content"][0]["text"] = json!("Edited visible text")
                 }
                 "compaction" => {
                     options["messages"]

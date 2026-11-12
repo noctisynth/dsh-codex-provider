@@ -19,6 +19,22 @@ impl Transport {
         session: &Session,
         request: &crate::responses::Request,
     ) -> Result<reqwest::Response, Error> {
+        let response = self
+            .response_request(session, request)?
+            .send()
+            .await
+            .map_err(Error::Network)?;
+        if !response.status().is_success() {
+            return Err(response_error(response).await);
+        }
+        Ok(response)
+    }
+
+    fn response_request(
+        &self,
+        session: &Session,
+        request: &crate::responses::Request,
+    ) -> Result<reqwest::RequestBuilder, Error> {
         let mut body = serde_json::to_value(crate::responses::StreamingRequest {
             request,
             store: false,
@@ -28,22 +44,19 @@ impl Transport {
         if session.login_method != LoginMethod::Siwc && body.get("instructions").is_none() {
             body["instructions"] = "".into();
         }
-        let response = self
-            .authorized(
-                session,
-                self.client.post(match session.login_method {
-                    LoginMethod::Siwc => "https://api.openai.com/v1/responses",
-                    _ => "https://chatgpt.com/backend-api/codex/responses",
-                }),
-            )?
-            .json(&body)
-            .send()
-            .await
-            .map_err(Error::Network)?;
-        if !response.status().is_success() {
-            return Err(response_error(response).await);
+        let mut builder = self.authorized(
+            session,
+            self.client.post(match session.login_method {
+                LoginMethod::Siwc => "https://api.openai.com/v1/responses",
+                _ => "https://chatgpt.com/backend-api/codex/responses",
+            }),
+        )?;
+        if session.login_method != LoginMethod::Siwc
+            && let Some(key) = request.cache_affinity_key()
+        {
+            builder = builder.header("session-id", key);
         }
-        Ok(response)
+        Ok(builder.json(&body))
     }
 
     pub fn new(headers: std::collections::HashMap<String, String>) -> Result<Self, Error> {
@@ -147,7 +160,89 @@ fn parse_api_error(status: u16, body: &[u8], request_id: Option<String>) -> Erro
 
 #[cfg(test)]
 mod tests {
-    use super::parse_api_error;
+    use super::*;
+    use serde_json::{Value, json};
+
+    #[test]
+    fn responses_cache_affinity_is_request_scoped_and_codex_only()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let transport = Transport::new(Default::default())?;
+        for method in [
+            LoginMethod::CodexBrowser,
+            LoginMethod::CodexDevice,
+            LoginMethod::Siwc,
+        ] {
+            let session: Session = serde_json::from_value(json!({
+                "login_method":method,"account_id":"synthetic-workspace",
+                "client_id":"synthetic-client","issuer":"https://auth.openai.com",
+                "subject":"synthetic-subject","host_id":"synthetic-host",
+                "id_token":"synthetic-id","nonce":"","access_token":"synthetic-access",
+                "refresh_token":"synthetic-refresh","expires_at":1,"scopes":[]
+            }))?;
+            let mut previous: Option<String> = None;
+            let mut previous_input: Option<Vec<Value>> = None;
+            for id in [
+                Some("session-a"),
+                Some("session-a"),
+                Some("session-b"),
+                None,
+                Some(""),
+            ] {
+                let mut options = json!({"model":"test","reasoningEffort":"high","messages":[
+                    {"role":"user","content":[{"type":"text","text":"Synthetic input"}]}
+                ]});
+                if let Some(id) = id {
+                    options["sessionId"] = json!(id);
+                }
+                if id == Some("session-a") && previous.is_some() {
+                    options["messages"]
+                        .as_array_mut()
+                        .ok_or("Missing messages")?
+                        .push(
+                            json!({"role":"user","content":[{"type":"text","text":"Follow-up"}]}),
+                        );
+                }
+                let request = crate::responses::from_host(&options.to_string())?;
+                let wire = transport.response_request(&session, &request)?.build()?;
+                let body: Value = serde_json::from_slice(
+                    wire.body()
+                        .and_then(reqwest::Body::as_bytes)
+                        .ok_or("Missing body")?,
+                )?;
+                let key = body["prompt_cache_key"].as_str();
+                assert_eq!(key.is_some(), id.is_some_and(|id| !id.is_empty()));
+                if method == LoginMethod::Siwc || key.is_none() {
+                    assert!(!wire.headers().contains_key("session-id"));
+                } else {
+                    assert_eq!(
+                        wire.headers()["session-id"].to_str()?,
+                        key.unwrap_or_default()
+                    );
+                }
+                assert!(body.get("sessionId").is_none());
+                assert_eq!(body["store"], false);
+                assert_eq!(body["stream"], true);
+                assert!(!wire.headers().contains_key("x-client-request-id"));
+                if id == Some("session-a") {
+                    if let Some(previous) = &previous {
+                        assert_eq!(key, Some(previous.as_str()));
+                    }
+                    if let Some(previous_input) = &previous_input {
+                        assert_eq!(
+                            &body["input"].as_array().ok_or("Missing input")?
+                                [..previous_input.len()],
+                            previous_input.as_slice(),
+                        );
+                    }
+                    previous = key.map(str::to_owned);
+                    previous_input = body["input"].as_array().cloned();
+                } else if id == Some("session-b") {
+                    assert_ne!(key, previous.as_deref());
+                }
+            }
+        }
+        Ok(())
+    }
 
     #[test]
     fn http_error_explains_rejected_parameter_without_dumping_response() {

@@ -35,6 +35,12 @@ pub(crate) struct Request {
     cache: reasoning_cache::Options,
 }
 
+impl Request {
+    pub(crate) fn cache_affinity_key(&self) -> Option<&str> {
+        self.prompt_cache_key.as_deref()
+    }
+}
+
 #[derive(Serialize)]
 pub(crate) struct StreamingRequest<'a> {
     #[serde(flatten)]

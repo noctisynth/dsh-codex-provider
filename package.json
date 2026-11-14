@@ -1,6 +1,6 @@
 {
   "name": "dsh-chatgpt-rs",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Use your ChatGPT account for model conversations, image input, and web search in DSH.",
   "license": "UNLICENSED",
   "repository": {

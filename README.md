@@ -12,6 +12,8 @@ dsh plugin --profile web add dsh-chatgpt-rs
 
 安装后，在 Web 界面的插件页启用。自定义 profile 请将 `web` 替换为对应名称。Desktop 与 Web profile 需要分别安装。
 
+若提示“这个包没有声明组合包”，请在添加插件时将 **安装源** 切换为 **npm 官方源** 后重试，镜像源可能尚未同步正式版本。
+
 适用于 DSH 0.2.2-rc.1，支持 Windows x64、macOS arm64 / x64 和 Linux x64（GNU/glibc）。
 
 ## 使用

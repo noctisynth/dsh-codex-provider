@@ -1,5 +1,17 @@
 # Changelog
 
+<!-- semifold:release version=0.1.1 -->
+## v0.1.1
+
+### Bug Fixes
+
+- [`57018ef`](https://github.com/noctisynth/dsh-codex-provider/commit/57018ef8fe5745acf677e350725bf3fbeb9d0f1a): Declare support for DSH 0.2.2-rc.2 and 0.2.2-rc.3 through engines.dsh while retaining support for 0.2.2-rc.1. Keep the existing SDK dependencies and runtime behavior unchanged.
+
+### Chores
+
+- [`d399c06`](https://github.com/noctisynth/dsh-codex-provider/commit/d399c0630678c52701affdf4395d1c64f23b03cb): Explain how to retry installation using the official npm registry when an out-of-date mirror reports that the package declares no bundle.
+<!-- semifold:release:end -->
+
 <!-- semifold:release version=0.1.0 -->
 ## v0.1.0
 

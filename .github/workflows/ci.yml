@@ -68,7 +68,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@v7
         with:
-          node-version: '22.20.0'
+          node-version: '24.11.0'
           registry-url: https://registry.npmjs.org
       - uses: pnpm/action-setup@v6
       - uses: noctisynth/setup-semifold@9dc3b2e2f25d5db332322b29c3d3436c857ca1d9

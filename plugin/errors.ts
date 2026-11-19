@@ -45,9 +45,13 @@ function failureCode(error: ProviderFailure): string {
 
 export function providerError(event: ProviderErrorEvent): LlmError {
   const error = event.error
-  return new LlmError(error.message, failureCode(error), {
-    cause: error,
-    status: error.status,
-    requestId: error.requestId === undefined ? undefined : ProviderRequestId(error.requestId),
-  })
+  return LlmError.fromFailure(
+    {
+      message: error.message,
+      code: failureCode(error),
+      status: error.status,
+      requestId: error.requestId === undefined ? undefined : ProviderRequestId(error.requestId),
+    },
+    { cause: error },
+  )
 }

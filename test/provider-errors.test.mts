@@ -40,6 +40,8 @@ test('native provider facts survive the adapter and real DSH failure normalizati
       'QUOTA',
     ],
     [{ kind: 'api', status: 401, message: 'Identity was rejected' }, 'AUTH'],
+    [{ kind: 'api', status: 403, message: 'Access was rejected' }, 'PERMISSION'],
+    [{ kind: 'cancelled', message: 'Request cancelled' }, 'ABORTED'],
     [{ kind: 'api', status: 429, message: 'Slow down' }, 'RATE_LIMIT'],
     [
       { kind: 'api', code: 'subscription_sharing_usage_unavailable', message: 'Usage unavailable' },
@@ -69,8 +71,9 @@ test('native provider facts survive the adapter and real DSH failure normalizati
         chunks.push(chunk)
       assert.equal(chunks.length, 1)
       const finish = chunks[0]
-      assert.equal(finish.type, 'finish')
-      assert.ok(finish.type === 'finish' && finish.reason.kind === 'error')
+      assert.ok(finish.type === 'finish')
+      assert.equal(finish.reason.kind, code === 'ABORTED' ? 'aborted' : 'error')
+      assert.ok(finish.reason.kind === 'error' || finish.reason.kind === 'aborted')
       assert.equal(finish.reason.failure.code, code)
       assert.equal(finish.reason.failure.message, error.message)
       assert.equal(finish.reason.failure.status, error.status)

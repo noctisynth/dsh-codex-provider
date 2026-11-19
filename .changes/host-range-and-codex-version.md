@@ -1,4 +1,4 @@
-dsh-codex-provider: minor:fix
+dsh-codex-provider: patch:fix
 ---
 
 Update the DSH SDK to 0.2.2-rc.5 and declare support for the 0.2.2 family from rc.2 through the final release instead of enumerating individual RCs. DSH rc.1 is no longer supported, and Node.js 24.9 or newer is required. Preserve provider error codes and diagnostics using the official LlmError.fromFailure API.

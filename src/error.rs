@@ -52,6 +52,10 @@ impl std::fmt::Display for ApiError {
 pub(crate) enum Error {
     #[error("OpenAI network request failed")]
     Network(#[source] reqwest::Error),
+    #[error("Could not connect to OpenAI through the model proxy. Check the proxy settings.")]
+    ModelProxyConnect(#[source] reqwest::Error),
+    #[error("Enter an HTTP or HTTPS proxy address without credentials or a path.")]
+    InvalidModelProxy,
     #[error("{0}")]
     Api(ApiError),
     #[error("Invalid OpenAI model catalog")]
@@ -76,8 +80,10 @@ impl Error {
         let kind = match self {
             Self::Api(_) => "api",
             Self::Auth(_) => "auth",
-            Self::Network(error) if error.is_timeout() => "timeout",
-            Self::Network(_) | Self::Interrupted => "transport",
+            Self::Network(error) | Self::ModelProxyConnect(error) if error.is_timeout() => {
+                "timeout"
+            }
+            Self::Network(_) | Self::ModelProxyConnect(_) | Self::Interrupted => "transport",
             Self::Cancelled => "cancelled",
             _ => "protocol",
         };

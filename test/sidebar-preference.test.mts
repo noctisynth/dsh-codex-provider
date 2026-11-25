@@ -14,12 +14,13 @@ import {
   readProfilePatches,
 } from '@deepseek-ai/dsh-app-boot'
 import { AuthorizationService } from '@deepseek-ai/dsh-authorization'
+import { serverResponseSchema } from '@deepseek-ai/dsh-client-connection'
 import { ConfigEditor } from '@deepseek-ai/dsh-config-editor'
 import { SettingsForms } from '@deepseek-ai/dsh-settings'
 import { WebRuntime } from '@deepseek-ai/dsh-web'
 import * as plugin from '../plugin/index.ts'
 
-test('sidebar preference persists through host settings without remounting authorization', async () => {
+test('plugin preferences persist through host settings without remounting authorization', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'codex-sidebar-settings-'))
   assert.equal(dirname(directory), resolve(tmpdir()))
   const profileDirectory = join(directory, 'profile')
@@ -97,7 +98,7 @@ test('sidebar preference persists through host settings without remounting autho
       if (config?.searchMode !== 'all' || web?.searchProvider === 'chatgpt') break
       await setTimeout(20)
     }
-    const set = async (key: string, value: unknown) => {
+    const editPreference = async (key: string, value: unknown) => {
       const handler = routes.get('/api/codex-provider/preference')
       assert.ok(handler)
       const response = await handler(
@@ -112,12 +113,15 @@ test('sidebar preference persists through host settings without remounting autho
           }),
         }),
       )
-      const result = await response.json()
-      assert.equal(result.result.ok, true, JSON.stringify(result))
+      return serverResponseSchema.parse(await response.json()).result
     }
     return {
       ctx,
-      set,
+      editPreference,
+      async set(key: string, value: unknown) {
+        const result = await editPreference(key, value)
+        assert.equal(result.ok, true, JSON.stringify(result))
+      },
       async close() {
         await settings.dispose()
         await editor.dispose()
@@ -137,6 +141,7 @@ test('sidebar preference persists through host settings without remounting autho
       searchMode: 'off',
       imageDetail: 'auto',
       quotaRefresh: '5',
+      modelProxy: '',
     })
     assert.equal(descriptor.autoGenerate, false)
     const entry = host.ctx.configEditor.entries().find((row) => row.options.id === 'codex-provider')
@@ -151,6 +156,7 @@ test('sidebar preference persists through host settings without remounting autho
         searchMode: 'off',
         imageDetail: 'auto',
         quotaRefresh: '5',
+        modelProxy: '',
       },
     )
     assert.equal(entry.fiber, originalFiber)
@@ -166,6 +172,7 @@ test('sidebar preference persists through host settings without remounting autho
         searchMode: 'off',
         imageDetail: 'auto',
         quotaRefresh: '5',
+        modelProxy: '',
       },
     )
     await host.set('sidebarAccount', 'deepseek')
@@ -177,6 +184,7 @@ test('sidebar preference persists through host settings without remounting autho
         searchMode: 'off',
         imageDetail: 'auto',
         quotaRefresh: '5',
+        modelProxy: '',
       },
     )
     assert.equal(mounts, 2)
@@ -190,6 +198,20 @@ test('sidebar preference persists through host settings without remounting autho
     await host.ctx.settings.update('web', { searchProvider: 'user-choice' })
     await host.set('imageDetail', 'original')
     await host.set('quotaRefresh', '15')
+    await host.set('modelProxy', '  http://127.0.0.1:7890  ')
+    const invalid = await host.editPreference(
+      'modelProxy',
+      'http://user:synthetic-secret@proxy.invalid',
+    )
+    assert.ok(!invalid.ok)
+    assert.equal(invalid.error.code, 'invalid-model-proxy')
+    assert.doesNotMatch(JSON.stringify(invalid), /synthetic-secret/)
+    assert.doesNotMatch(await readFile(profile.patchPath, 'utf8'), /synthetic-secret/)
+    assert.equal(
+      readConfig<{ modelProxy: string }>(host.ctx, 'codex-provider').modelProxy,
+      'http://127.0.0.1:7890',
+    )
+    assert.equal(mounts, 2)
     await host.set('searchMode', 'off')
     assert.equal(
       readConfig<{ searchProvider: string }>(host.ctx, 'web').searchProvider,
@@ -203,6 +225,12 @@ test('sidebar preference persists through host settings without remounting autho
       '15',
     )
     assert.equal(readConfig<{ searchProvider: string }>(host.ctx, 'web').searchProvider, 'chatgpt')
+    assert.equal(
+      readConfig<{ modelProxy: string }>(host.ctx, 'codex-provider').modelProxy,
+      'http://127.0.0.1:7890',
+    )
+    await host.set('modelProxy', '')
+    assert.equal(readConfig<{ modelProxy: string }>(host.ctx, 'codex-provider').modelProxy, '')
     assert.equal(
       readConfig<{ imageDetail: string }>(host.ctx, 'codex-provider').imageDetail,
       'original',

@@ -38,6 +38,8 @@ dsh plugin --profile web add dsh-chatgpt-rs
 
 搜索范围、图片精度、自动审批和侧边栏账号显示均在此设置。搜索与审批也可用于其他模型，消耗当前 ChatGPT 账号用量。切换或退出账号会停止插件正在进行的操作。
 
+如需让模型请求走代理，在 **设置 → ChatGPT → 模型请求代理** 中填入 HTTP 或 HTTPS 代理地址（例如 `http://127.0.0.1:7890`）并保存。代理失败时不会改为直连。清空并保存可恢复默认网络设置。此选项不改变登录、模型列表或额度查询的网络设置。
+
 ## 反馈
 
 请通过 [Issues](https://github.com/noctisynth/dsh-codex-provider/issues) 反馈问题，并附上 DSH 与插件版本、操作系统和错误提示。

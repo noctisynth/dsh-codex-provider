@@ -2,6 +2,7 @@ import type { Context, Fiber, Volatile } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-config-editor'
 import type {} from '@deepseek-ai/dsh-settings'
 import type {} from '@deepseek-ai/dsh-web'
+import native from '../index.cjs'
 import {
   type ImageDetail,
   type QuotaRefreshInterval,
@@ -10,6 +11,12 @@ import {
 } from '../shared/features.ts'
 
 export const searchProviderId = 'chatgpt'
+
+export class InvalidModelProxy extends Error {
+  constructor() {
+    super('Enter an HTTP or HTTPS proxy address without credentials or a path.')
+  }
+}
 
 /** Own scalar edits and the reversible selection of the shared DSH search source. */
 export class Preferences {
@@ -111,12 +118,17 @@ type PreferenceChange =
   | { key: 'searchMode'; value: SearchMode }
   | { key: 'imageDetail'; value: ImageDetail }
   | { key: 'quotaRefresh'; value: QuotaRefreshInterval }
+  | { key: 'modelProxy'; value: string }
 
 function parsePreference(payload: unknown): PreferenceChange {
   if (!payload || typeof payload !== 'object' || !('key' in payload) || !('value' in payload))
     throw new Error('Invalid settings parameters.')
   const { key, value } = payload
   switch (key) {
+    case 'modelProxy':
+      if (typeof value !== 'string' || !native.isValidModelProxy(value))
+        throw new InvalidModelProxy()
+      return { key, value: value.trim() }
     case 'quotaRefresh':
       if (
         typeof value === 'string' &&

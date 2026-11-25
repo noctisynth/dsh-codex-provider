@@ -88,6 +88,7 @@ test('the shipped settings preserve account actions, host React sharing and styl
     []
   const requests: { method: string; payload: unknown }[] = []
   let quotaUnavailable = false
+  let syncProxySetting: (() => void) | undefined
   let running = false
   let active: string | undefined
   let accounts: AccountStatus['accounts'] = []
@@ -100,11 +101,24 @@ test('the shipped settings preserve account actions, host React sharing and styl
       )
       if (method.endsWith('/preference')) {
         const change = payload as { key: keyof SidebarPreference; value: never }
-        assert.ok(snapshot.value)
-        snapshot = { ...snapshot, value: { ...snapshot.value, [change.key]: change.value } }
-        listeners.forEach((listener) => {
-          listener()
-        })
+        if (change.key === 'modelProxy' && !native.isValidModelProxy(change.value))
+          return {
+            ok: false,
+            error: {
+              code: 'invalid-model-proxy',
+              message: 'Enter an HTTP or HTTPS proxy address without credentials or a path.',
+              details: {},
+            },
+          }
+        const publish = () => {
+          assert.ok(snapshot.value)
+          snapshot = { ...snapshot, value: { ...snapshot.value, [change.key]: change.value } }
+          listeners.forEach((listener) => {
+            listener()
+          })
+        }
+        if (change.key === 'modelProxy') syncProxySetting = publish
+        else publish()
       }
       if (method.endsWith('/login')) running = true
       if (method.endsWith('/quota') && quotaUnavailable)
@@ -259,6 +273,57 @@ test('the shipped settings preserve account actions, host React sharing and styl
       .find((button) => button.props['aria-label'] === '侧边栏账号')
     assert.ok(sidebar)
     assert.ok(sidebar.findAllByType('span').some((span) => span.children.includes('DeepSeek')))
+    const modelProxy = view.root
+      .findAllByType('input')
+      .find((input) => input.props.inputMode === 'url')
+    assert.ok(modelProxy)
+    const proxyLabel = view.root
+      .findAllByType('label')
+      .find((label) => label.props.htmlFor === modelProxy.props.id)
+    assert.ok(proxyLabel)
+    assert.equal(proxyLabel.props.htmlFor, modelProxy.props.id)
+    assert.equal(proxyLabel.props.children, '模型请求代理')
+    const saveProxy = view.root
+      .findAllByType('button')
+      .find((button) => button.props.children === '保存')
+    assert.ok(saveProxy)
+    assert.equal(saveProxy.props['aria-disabled'], true)
+    await act(async () => {
+      modelProxy.props.onChange({ currentTarget: { value: 'not an address' } })
+    })
+    assert.equal(
+      requests.filter((req) => (req.payload as { key?: string } | null)?.key === 'modelProxy')
+        .length,
+      0,
+    )
+    await act(async () => {
+      await saveProxy.props.onClick()
+    })
+    assert.equal(modelProxy.props.value, 'not an address')
+    assert.equal(modelProxy.props['aria-invalid'], true)
+    assert.match(JSON.stringify(view.toJSON()), /请输入不含用户名、密码或路径/)
+    await act(async () => {
+      modelProxy.props.onChange({ currentTarget: { value: 'http://127.0.0.1:7890' } })
+    })
+    await act(async () => {
+      await saveProxy.props.onClick()
+    })
+    assert.equal(snapshot.value?.modelProxy, undefined)
+    assert.equal(modelProxy.props.value, 'http://127.0.0.1:7890')
+    assert.match(JSON.stringify(view.toJSON()), /代理设置已保存/)
+    assert.equal(saveProxy.props['aria-disabled'], true)
+    await act(async () => syncProxySetting?.())
+    assert.equal(snapshot.value?.modelProxy, 'http://127.0.0.1:7890')
+    await act(async () => {
+      modelProxy.props.onChange({ currentTarget: { value: '' } })
+    })
+    await act(async () => {
+      await saveProxy.props.onClick()
+    })
+    assert.equal(modelProxy.props.value, '')
+    assert.match(JSON.stringify(view.toJSON()), /已恢复默认网络设置/)
+    await act(async () => syncProxySetting?.())
+    assert.equal(snapshot.value?.modelProxy, '')
     const button = view.root
       .findAllByType('button')
       .find((button) => button.props['aria-label'] === '使用 ChatGPT 登录')

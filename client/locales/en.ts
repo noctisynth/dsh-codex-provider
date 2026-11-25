@@ -34,6 +34,18 @@ export default {
     'Built-in web search is not available with this sign-in method.',
   'Built-in web search is not available with this sign-in method. Choose an SIWC account to use it.':
     'Built-in web search is not available with this sign-in method. Choose an SIWC account to use it.',
+  'Model request proxy': 'Model request proxy',
+  'Use an HTTP or HTTPS forward proxy for ChatGPT model requests only. If it fails, requests are not sent directly. Clear the address and save to restore the default network settings.':
+    'Use an HTTP or HTTPS forward proxy for ChatGPT model requests only. If it fails, requests are not sent directly. Clear the address and save to restore the default network settings.',
+  'Enter an HTTP or HTTPS proxy address without credentials or a path.':
+    'Enter an HTTP or HTTPS proxy address without credentials or a path.',
+  Save: 'Save',
+  'Saving…': 'Saving…',
+  'Loading proxy settings…': 'Loading proxy settings…',
+  'Proxy settings are unavailable.': 'Proxy settings are unavailable.',
+  'Proxy settings are read-only.': 'Proxy settings are read-only.',
+  'Proxy settings saved.': 'Proxy settings saved.',
+  'Using default network settings.': 'Using default network settings.',
   'Image detail': 'Image detail',
   'Choose the detail used to read attached images. Available levels depend on the model.':
     'Choose the detail used to read attached images. Available levels depend on the model.',

@@ -11,7 +11,7 @@ mod transport;
 
 pub use binding::{
     AccountInfo, Cancellation, ChatGptClient, LoginAttempt, LoginResult, LogoutResult, Model,
-    ModelReasoning, ModelReasoningEffort, create_host_id, describe_session,
+    ModelReasoning, ModelReasoningEffort, create_host_id, describe_session, is_valid_model_proxy,
 };
 pub use capabilities::Capabilities;
 pub use quota::{Quota, QuotaWindow};

@@ -6,6 +6,7 @@ import type { LoginState } from '../shared/account-ui.ts'
 import type { Accounts } from './accounts.ts'
 import { accountsKey } from './accounts.ts'
 import type { Operations } from './operations.ts'
+import { InvalidModelProxy } from './preferences.ts'
 
 function selectedId(payload: unknown): string {
   if (
@@ -198,15 +199,22 @@ export function mountAccountUi(
               cause.syscall === 'rename' &&
               'code' in cause &&
               ['EACCES', 'EBUSY', 'EPERM'].includes(String(cause.code))
+            const invalidProxy = action === 'preference' && cause instanceof InvalidModelProxy
             result = {
               ok: false,
               error: {
-                code: fileError ? 'settings-file-unavailable' : 'chatgpt-operation-failed',
-                message: fileError
-                  ? 'Cannot save the configuration file. Close it in your editor and try again. If the problem continues, check write permissions.'
-                  : action === 'preference'
-                    ? 'Could not save settings. Try again later.'
-                    : 'The ChatGPT operation failed. Check your sign-in and try again.',
+                code: invalidProxy
+                  ? 'invalid-model-proxy'
+                  : fileError
+                    ? 'settings-file-unavailable'
+                    : 'chatgpt-operation-failed',
+                message: invalidProxy
+                  ? cause.message
+                  : fileError
+                    ? 'Cannot save the configuration file. Close it in your editor and try again. If the problem continues, check write permissions.'
+                    : action === 'preference'
+                      ? 'Could not save settings. Try again later.'
+                      : 'The ChatGPT operation failed. Check your sign-in and try again.',
                 details: {},
               },
             }

@@ -23,6 +23,7 @@ export class ChatGptAdapter extends LlmAdapter {
   private catalog: Promise<CatalogEntry[]> | undefined
   private searchMode: () => SearchMode
   private imageDetail: () => ImageDetail
+  private modelProxy: () => string
 
   constructor(
     client: ChatGptClient,
@@ -31,6 +32,7 @@ export class ChatGptAdapter extends LlmAdapter {
     attachments?: Pick<AttachmentStore, 'readImage'>,
     searchMode: () => SearchMode = () => 'off',
     imageDetail: () => ImageDetail = () => 'auto',
+    modelProxy: () => string = () => '',
   ) {
     super()
     this.client = client
@@ -39,6 +41,7 @@ export class ChatGptAdapter extends LlmAdapter {
     this.attachments = attachments
     this.searchMode = searchMode
     this.imageDetail = imageDetail
+    this.modelProxy = modelProxy
   }
 
   providerInfo() {
@@ -199,7 +202,7 @@ export class ChatGptAdapter extends LlmAdapter {
         imageDetail: this.imageDetail(),
       }
       reader = this.client
-        .streamResponse(record, JSON.stringify(request), operation.cancellation)
+        .streamResponse(record, JSON.stringify(request), operation.cancellation, this.modelProxy())
         .getReader()
       for (;;) {
         const { done, value } = await reader.read()

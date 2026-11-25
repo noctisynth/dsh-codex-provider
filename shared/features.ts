@@ -9,12 +9,14 @@ export type PreferenceKey =
   | 'searchMode'
   | 'imageDetail'
   | 'quotaRefresh'
+  | 'modelProxy'
 
 export interface FeaturePreferences {
   codexReview?: boolean
   searchMode?: SearchMode
   imageDetail?: ImageDetail
   quotaRefresh?: QuotaRefreshInterval
+  modelProxy?: string
 }
 
 declare module '@deepseek-ai/dsh-llm' {

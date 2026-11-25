@@ -1,12 +1,43 @@
+use std::sync::Mutex;
+
+use reqwest::{Client, Url, header::HeaderMap};
+
 use crate::{
     auth::{LoginMethod, Session},
     error::{ApiError, Error},
     models::{self, Model},
 };
 
-#[derive(Clone)]
 pub(crate) struct Transport {
-    client: reqwest::Client,
+    client: Client,
+    default_headers: HeaderMap,
+    model_proxy: Mutex<Option<(String, Client)>>,
+}
+
+pub(crate) fn parse_model_proxy(address: &str) -> Result<Option<Url>, Error> {
+    let address = address.trim();
+    if address.is_empty() {
+        return Ok(None);
+    }
+    let (_, authority) = address.split_once("://").ok_or(Error::InvalidModelProxy)?;
+    let authority = authority.strip_suffix('/').unwrap_or(authority);
+    if authority.is_empty()
+        || authority.contains(['@', '/', '\\', '?', '#'])
+        || authority.chars().any(char::is_whitespace)
+    {
+        return Err(Error::InvalidModelProxy);
+    }
+    let url = Url::parse(address).map_err(|_| Error::InvalidModelProxy)?;
+    if !matches!(url.scheme(), "http" | "https") || !url.has_host() || url.port() == Some(0) {
+        return Err(Error::InvalidModelProxy);
+    }
+    Ok(Some(url))
+}
+
+fn client_builder(headers: HeaderMap) -> reqwest::ClientBuilder {
+    Client::builder()
+        .default_headers(headers)
+        .redirect(reqwest::redirect::Policy::none())
 }
 
 impl Transport {
@@ -18,12 +49,20 @@ impl Transport {
         &self,
         session: &Session,
         request: &crate::responses::Request,
+        model_proxy: &str,
     ) -> Result<reqwest::Response, Error> {
+        let client = self.model_client(model_proxy)?;
         let response = self
-            .response_request(session, request)?
+            .response_request(&client, session, request)?
             .send()
             .await
-            .map_err(Error::Network)?;
+            .map_err(|error| {
+                if !model_proxy.trim().is_empty() && error.is_connect() {
+                    Error::ModelProxyConnect(error)
+                } else {
+                    Error::Network(error)
+                }
+            })?;
         if !response.status().is_success() {
             return Err(response_error(response).await);
         }
@@ -32,6 +71,7 @@ impl Transport {
 
     fn response_request(
         &self,
+        client: &Client,
         session: &Session,
         request: &crate::responses::Request,
     ) -> Result<reqwest::RequestBuilder, Error> {
@@ -46,7 +86,7 @@ impl Transport {
         }
         let mut builder = self.authorized(
             session,
-            self.client.post(match session.login_method {
+            client.post(match session.login_method {
                 LoginMethod::Siwc => "https://api.openai.com/v1/responses",
                 _ => "https://chatgpt.com/backend-api/codex/responses",
             }),
@@ -69,12 +109,40 @@ impl Transport {
                     .map_err(|_| Error::Protocol("Invalid DSH attribution header value"))?,
             );
         }
-        let client = reqwest::Client::builder()
-            .default_headers(default_headers)
-            .redirect(reqwest::redirect::Policy::none())
+        let client = client_builder(default_headers.clone())
             .build()
             .map_err(Error::Network)?;
-        Ok(Self { client })
+        Ok(Self {
+            client,
+            default_headers,
+            model_proxy: Mutex::new(None),
+        })
+    }
+
+    fn model_client(&self, address: &str) -> Result<Client, Error> {
+        let address = address.trim();
+        let mut cached = self
+            .model_proxy
+            .lock()
+            .map_err(|_| Error::Protocol("Model proxy client unavailable"))?;
+        if address.is_empty() {
+            *cached = None;
+            return Ok(self.client.clone());
+        }
+        if let Some((previous, client)) = &*cached
+            && previous == address
+        {
+            return Ok(client.clone());
+        }
+        let url = parse_model_proxy(address)?.ok_or(Error::InvalidModelProxy)?;
+        let proxy = reqwest::Proxy::all(url).map_err(|_| Error::InvalidModelProxy)?;
+        // An explicit proxy disables environment proxy selection. No bypass rules are attached.
+        let client = client_builder(self.default_headers.clone())
+            .proxy(proxy)
+            .build()
+            .map_err(Error::Network)?;
+        *cached = Some((address.to_owned(), client.clone()));
+        Ok(client)
     }
 
     pub(crate) fn authorized(
@@ -203,7 +271,9 @@ mod tests {
                         );
                 }
                 let request = crate::responses::from_host(&options.to_string())?;
-                let wire = transport.response_request(&session, &request)?.build()?;
+                let wire = transport
+                    .response_request(transport.client(), &session, &request)?
+                    .build()?;
                 let body: Value = serde_json::from_slice(
                     wire.body()
                         .and_then(reqwest::Body::as_bytes)

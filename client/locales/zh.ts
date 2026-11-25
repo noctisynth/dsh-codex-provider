@@ -34,6 +34,18 @@ export default {
     '当前登录方式暂未提供内置网页搜索。',
   'Built-in web search is not available with this sign-in method. Choose an SIWC account to use it.':
     '当前登录方式暂未提供内置网页搜索。切换到 SIWC 账号后可使用。',
+  'Model request proxy': '模型请求代理',
+  'Use an HTTP or HTTPS forward proxy for ChatGPT model requests only. If it fails, requests are not sent directly. Clear the address and save to restore the default network settings.':
+    '仅为 ChatGPT 模型请求使用 HTTP 或 HTTPS 转发代理。代理失败时不会改为直连。清空地址并保存可恢复默认网络设置。',
+  'Enter an HTTP or HTTPS proxy address without credentials or a path.':
+    '请输入不含用户名、密码或路径的 HTTP 或 HTTPS 代理地址。',
+  Save: '保存',
+  'Saving…': '正在保存…',
+  'Loading proxy settings…': '正在读取代理设置…',
+  'Proxy settings are unavailable.': '代理设置暂不可用。',
+  'Proxy settings are read-only.': '代理设置为只读。',
+  'Proxy settings saved.': '代理设置已保存。',
+  'Using default network settings.': '已恢复默认网络设置。',
   'Image detail': '图片精度',
   'Choose the detail used to read attached images. Available levels depend on the model.':
     '选择读取所附图片时使用的精度。可用档位取决于模型。',

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use eventsource_stream::{Event, Eventsource};
 use futures_util::{StreamExt, TryStreamExt, stream::BoxStream};
 use serde::{Deserialize, Serialize};
@@ -52,10 +54,11 @@ pub(crate) struct StreamingRequest<'a> {
 }
 
 pub(crate) fn stream(
-    transport: Transport,
+    transport: Arc<Transport>,
     session: Session,
     mut request: Request,
     cancel: CancellationToken,
+    model_proxy: String,
 ) -> BoxStream<'static, Result<Value, Error>> {
     Box::pin(async_stream::try_stream! {
         if cancel.is_cancelled() { Err(Error::Cancelled)?; }
@@ -75,7 +78,7 @@ pub(crate) fn stream(
         )?;
         let response = tokio::select! {
             _ = cancel.cancelled() => Err(Error::Cancelled),
-            response = transport.response(&session, &request) => response,
+            response = transport.response(&session, &request, &model_proxy) => response,
         }?;
         let source = response.bytes_stream().eventsource()
             .map_err(Error::from).boxed();

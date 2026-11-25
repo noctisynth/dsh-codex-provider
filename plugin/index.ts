@@ -28,6 +28,7 @@ export const Config = z.object({
   searchMode: z.union(['off', 'chatgpt', 'all']).default('off').volatile(),
   imageDetail: z.union(imageDetails).default('auto').volatile(),
   quotaRefresh: z.union(quotaRefreshIntervals).default('5').volatile(),
+  modelProxy: z.string().default('').volatile(),
   previousSearchProvider: z.string().hidden().volatile(),
 })
 
@@ -37,6 +38,7 @@ export interface Config {
   searchMode: Volatile<SearchMode>
   imageDetail: Volatile<ImageDetail>
   quotaRefresh: Volatile<QuotaRefreshInterval>
+  modelProxy: Volatile<string>
   previousSearchProvider: Volatile<string | undefined>
 }
 
@@ -63,6 +65,7 @@ export function apply(ctx: Context, config: Config): void {
     ctx.attachments,
     () => config.searchMode.get(),
     () => config.imageDetail.get(),
+    () => config.modelProxy.get(),
   )
   ctx.on('credentials/record-updated', (key) => {
     if (key === accountsKey) adapter.invalidateCatalog()

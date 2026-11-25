@@ -4,12 +4,17 @@ pub use types::{
     AccountInfo, LoginResult, LogoutResult, Model, ModelReasoning, ModelReasoningEffort,
 };
 
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use napi_derive::napi;
 use tokio_util::sync::CancellationToken;
 
-use crate::{auth, error::Error, responses, transport::Transport};
+use crate::{
+    auth,
+    error::Error,
+    responses,
+    transport::{Transport, parse_model_proxy},
+};
 use futures_util::StreamExt;
 use napi::{Env, bindgen_prelude::ReadableStream};
 
@@ -136,8 +141,13 @@ pub fn describe_session(record: String) -> napi::Result<AccountInfo> {
 }
 
 #[napi]
+pub fn is_valid_model_proxy(address: String) -> bool {
+    parse_model_proxy(&address).is_ok()
+}
+
+#[napi]
 pub struct ChatGptClient {
-    transport: Transport,
+    transport: Arc<Transport>,
 }
 
 #[napi]
@@ -180,6 +190,7 @@ impl ChatGptClient {
         record: String,
         request_json: String,
         cancellation: &Cancellation,
+        model_proxy: Option<String>,
     ) -> napi::Result<ReadableStream<'env, serde_json::Value>> {
         let session = auth::Session::decode(&record)?;
         let request = responses::from_host(&request_json)?;
@@ -188,6 +199,7 @@ impl ChatGptClient {
             session,
             request,
             cancellation.token.child_token(),
+            model_proxy.unwrap_or_default(),
         )
         .map(|event| match event {
             Err(Error::Cancelled) => Err(Error::Cancelled.into()),
@@ -200,7 +212,7 @@ impl ChatGptClient {
     #[napi(constructor)]
     pub fn new(headers: std::collections::HashMap<String, String>) -> napi::Result<Self> {
         Ok(Self {
-            transport: Transport::new(headers)?,
+            transport: Arc::new(Transport::new(headers)?),
         })
     }
 

@@ -38,3 +38,12 @@ pnpm 因 rc.5 发布时间较近，按其机制记录仅针对所需包与精确
 用户后续授权推送实施成果，并要求准备 0.1.2 和监听线上流水线。主分支已同步已有的 0.1.1 发布基线。首次主分支运行的四个原生目标、质量检查、归档加载、完整产物收集及 Semifold 0.3.5 发布准备均成功；依据：<https://github.com/noctisynth/dsh-codex-provider/actions/runs/44482844850>。Semifold 正确根据当时 minor 意图生成 PR #3 的 0.2.0 计划，实际发包步骤按版本准备分支跳过；这是流水线路由正确、但目标编号与用户期望不一致，不是已经发布 0.2.0。
 
 用户进一步明确授权将现有 changeset 改为 patch，单独线性提交并推送，使 Semifold 从 0.1.1 准备 0.1.2，再继续监听新主分支与更新后的 release PR 检查。不手工修改根包版本、消费 changeset、合并发布 PR 或执行发包；原有未提交内容保留。该修正仅改变发布编号意图，不恢复 rc.1 支持、不降低 Node 要求，也不回滚错误接口与 Codex 版本更新。
+
+## 最新预发布准入补齐（2026-11-26）
+
+- 观察：npm 的 latest、next 仍为 0.2.2-rc.5，alpha 为 0.2.3-alpha.2，后者发布于 2026-11-22 09:57:12 UTC；GitHub 发布订阅的最新条目同为 dsh-v0.2.3-alpha.2。最新发布与 latest 标签不等价，不从版本编号推断上游发布策略。来源：<https://registry.npmjs.org/@deepseek-ai%2Fdsh>、<https://github.com/deepseek-ai/deepseek-harness/releases.atom>。GitHub 未认证 REST 查询返回 403，未作为成功证据。
+- 用户确认新版已支持；本次仅修复声明。此前上界排除了整个 0.2.3 预发布系列，现按 SPEC-001 精确加入该版本，不自动放开其他 alpha、RC 或正式版，也不启用兼容性豁免。
+- 官方目标版本的准入逻辑仍优先 engines.dsh、否则检查 DSH peer，且包含预发布比较；与当前开发基线使用的判断一致。来源：<https://raw.githubusercontent.com/deepseek-ai/deepseek-harness/dsh-v0.2.3-alpha.2/packages/boot/app-boot/src/plugin-compatibility.ts>。未据此声称其他运行时 API 均已验证。
+- 已通过：Node 24.11.0 下 2 项正式宿主准入回归，覆盖 engine 与 peer 两条分支的 20 个版本样例（含目标版本、构建元数据、旧下限、相邻 alpha/RC/正式版），以及 peer 范围和精确开发基线一致性；针对性 Biome、两套 Oxc 类型检查和 diff 空白检查通过。
+- 新增 patch changeset；Semifold 0.3.4 的只读计划通过。计划仍为 0.1.2 → 0.2.0，原因是原已提交的模型请求代理 minor 意图；本次不修改该既有意图，不手工更新版本或消费变更集。
+- 保持开发依赖、锁文件、业务代码及已有未提交专题不变；不重新构建或安装插件，不调用真实模型、不读取凭据。本次验证是兼容性声明和边界回归，不是 0.2.3-alpha.2 的完整桌面集成验收。

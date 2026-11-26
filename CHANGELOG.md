@@ -1,5 +1,17 @@
 # Changelog
 
+<!-- semifold:release version=0.2.0 -->
+## v0.2.0
+
+### Bug Fixes
+
+- [`e9109e1`](https://github.com/noctisynth/dsh-codex-provider/commit/e9109e1aa44ca7ccbdf656800c3ae9513bc24919): Declare compatibility with DSH 0.2.3-alpha.2 while preserving the existing 0.2.2 support range. Keep host peer requirements aligned without changing the development SDK or runtime behavior.
+
+### New Features
+
+- [`03f8f02`](https://github.com/noctisynth/dsh-codex-provider/commit/03f8f025010652f97e71c4f61904e22370b83192): Add an optional HTTP or HTTPS model request proxy in ChatGPT settings. SIWC and Codex model requests use the configured proxy without falling back to a direct connection. Clearing it restores the default network settings; sign-in and other non-model requests are unchanged.
+<!-- semifold:release:end -->
+
 <!-- semifold:release version=0.1.2 -->
 ## v0.1.2
 

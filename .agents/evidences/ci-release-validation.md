@@ -47,7 +47,7 @@ release 分支显式 dispatch 验证：https://github.com/noctisynth/dsh-codex-p
 - 观察：迁移开始时公开 registry 的根包及四个平台包均已发布 0.2.0；远端主分支已包含该版本。迁移以远端版本为基线，原工作区的未提交业务与方案内容不参与发布。
 - 官方 npm trust 要求 npm 11.15.0 及以上、对应包写权限和账号级 2FA；不接受 bypass-2FA granular token 管理可信关系。此次使用隔离的 npm 11.21.3 管理配置，不升级项目依赖。来源：https://docs.npmjs.com/cli/v11/commands/npm-trust
 - 发布 OIDC 最低 npm 11.5.1、Node 22.14.0，现有 Node 24.11.0 随附 npm 11.6.1 满足要求。新可信配置的首次成功发布须在 2 天内完成；配置保存不验证实际工作流匹配。来源：https://docs.npmjs.com/trusted-publishers/ ，https://raw.githubusercontent.com/nodejs/node/v24.11.0/deps/npm/package.json
-- 配置目标为五个包分别绑定 noctisynth/dsh-codex-provider 的 CI 工作流；仅允许直接发布，不增加 dist-tag 或 staged publish 权限。发布 job 没有 GitHub Environment，不配置虚构环境名；保留 job 级 OIDC 权限和 GitHub 自动生成的工作流 token。
+- 五个包已分别绑定 noctisynth/dsh-codex-provider 的 CI 工作流，创建前均无已有 trust；逐包回读的仓库、工作流与直接发布权限一致。CLI 仅显式请求直接发布；实际 registry 同时返回默认 staged publish 权限，与官方新配置默认允许 staged publish 的规则一致，并非额外申请；没有 dist-tag 权限，也不使用 staged publish 改变现有流程。发布 job 没有 GitHub Environment，不配置虚构环境名；保留 job 级 OIDC 权限和 GitHub 自动生成的工作流 token。
 - 源码核对：napi-rs 3.10.12 的 npmClient 默认为 npm；平台发布通过子进程 npm publish 并继承环境，无 whoami 或 npm token 必填前置检查。因此保持原有 Semifold → npm lifecycle → napi-rs 平台包发布流程，不自造发布循环。来源：https://github.com/napi-rs/napi-rs/blob/cli%403.10.12/cli/src/api/pre-publish.ts ，https://github.com/napi-rs/napi-rs/blob/cli%403.10.12/cli/src/utils/config.ts
 - CI 移除 npm token 注入和必填门禁，保留公开仓库检查、provenance 与完整质量依赖；增加 OIDC 环境存在性检查，不打印身份 token。首次五包 OIDC 发布成功后，再按 npm 官方建议禁用传统 token 发布并删除仓库 NPM_TOKEN secret；不扩大到撤销可能被其他项目使用的账号 token。
 
@@ -56,4 +56,14 @@ release 分支显式 dispatch 验证：https://github.com/noctisynth/dsh-codex-p
 - CI YAML 解析和全部 shell 脚本语法通过；确认发布仍只在 main push、全量检查成功后执行，Semifold 及 provenance 未变。
 - 四个合成门禁场景通过：公开仓库且 OIDC 信息完整时允许；私有源、缺请求 URL 或缺请求 token 时拒绝。没有真实凭据或远端发布副作用。
 - Semifold 0.3.4 只读计划确认新增 patch changeset 将 0.2.0 升为 0.2.1，未手工更新版本、消费变更集或发布。差异空白检查通过。
-- 可信关系配置、远程全量检查、实际五包发布与禁用 token 的结果以随后真实验收为准；上述离线结果不能替代 OIDC 发布成功。
+- 上述离线结果不能替代 OIDC 发布成功；实际发布和权限收尾须以下述远程结果为准。
+
+### 远程验收
+
+- 迁移提交 ffdd164 的主分支检查全部成功，包含四目标构建、质量与行为回归、打包加载及完整产物收集；Semifold 创建 0.2.1 发布 PR #5，未在版本准备阶段发包。运行：https://github.com/noctisynth/dsh-codex-provider/actions/runs/45779730737
+- PR #5 的实际差异仅为消费本次 patch changeset、生成 changelog 和将根版本从 0.2.0 更新为 0.2.1。PR 运行全部检查通过，发布 job 按条件跳过；确认头提交未变化后，以 squash 合并为 db5ea0701ffea1c9e9075001dbe1354921aad927。运行：https://github.com/noctisynth/dsh-codex-provider/actions/runs/45781316933 ，PR：https://github.com/noctisynth/dsh-codex-provider/pull/5
+- 合并后的主分支运行 45783257223 全量成功，实际执行了公开源/OIDC 门禁、官方平台产物装配及发布步骤。日志确认四个平台包与根包均完成 0.2.1 发布，GitHub Release 于 2026-11-26 08:39:13 UTC 创建；发布步骤未注入 NPM_TOKEN 或 NODE_AUTH_TOKEN，保留 GitHub 自动 token 与 provenance。运行：https://github.com/noctisynth/dsh-codex-provider/actions/runs/45783257223 ，Release：https://github.com/noctisynth/dsh-codex-provider/releases/tag/dsh-chatgpt-rs-v0.2.1
+- 发布后即时读取 registry 返回旧标签或 404，日志明确提示新包仍在处理。官方从 2026-07-28 起在可安装前扫描新包，典型约 5 分钟，可能超过 15 分钟；这不是发布时间保证。保留发布被接受与公开可下载两个独立验收结果，不重复发包或绕过扫描。来源：https://github.blog/changelog/2026-07-28-npm-publish-time-malware-scanning-and-dual-use-metadata/
+- 随后五包的 0.2.1 精确版本与 latest 均公开可见，根包四个 optionalDependencies 同为 0.2.1。逐包解码 registry 的 SLSA provenance，确认包名/版本、sha512 与 registry integrity 一致，仓库、主分支、CI 工作流、合并提交和运行 45783257223 均匹配；不是只检查 provenance 字段是否存在。结合无 npm token 注入的实际发布成功，完成五包 OIDC 发布验收。此次未新增桌面安装或业务功能验收。
+- 五包分别执行 npm access set mfa=publish 均成功，保留可信发布，禁止传统 token 绕过 2FA；对应官方实现为 publish_requires_tfa=true、automation_token_overrides_tfa=false，而非仍允许 automation token 的 mfa=automation。随后仅删除本仓库 NPM_TOKEN secret，并回读确认不存在；未撤销可能用于其他项目的账号 token。来源：https://docs.npmjs.com/trusted-publishers/ ，https://github.com/npm/cli/blob/v11.21.3/workspaces/libnpmaccess/lib/index.js
+- 本次管理登录已通过 npm 官方 logout 退出，临时认证配置及日志已清理；未读取或输出 token 值。隔离工作区之外的原主分支 HEAD、原有 19 个已修改或未跟踪文件及未提交 diff 经比较保持不变。

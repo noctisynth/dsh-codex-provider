@@ -4,8 +4,8 @@
 
 ## npm 可信发布迁移（2026-11-26）
 
-- [ ] 为根包及四个平台包配置 GitHub Actions 可信发布；CI 不再注入 npm token，保留 Semifold、napi-rs 和 provenance。依据 RFC-001、SPEC-001、EVIDENCE-044。
-- [ ] 完成全量 CI、Semifold patch 发布和五包 OIDC/provenance 验收；成功后禁用传统 token 发布并清理仓库发布 secret。原有本地工作保持不变。
+- [x] 为根包及四个平台包配置 GitHub Actions 可信发布并逐包回读确认；CI 已移除 npm token 注入，保留 Semifold、napi-rs 和 provenance，迁移提交的主分支全量检查通过。依据 RFC-001、SPEC-001、EVIDENCE-044。
+- [x] 完成全量 CI、Semifold 0.2.1 patch 发布和五包公开版本/OIDC/provenance 验收；逐包禁用传统 token 发布并删除仓库 NPM_TOKEN secret，回读确认 secret 不存在。本次临时 npm 登录已退出；原有本地工作保持不变。
 
 ## 模型请求代理
 
@@ -75,7 +75,7 @@
 - [x] 同步分发身份，配置质量、四目标原生及 Semifold 版本 PR/发布依赖链，记录变更集；本地原生、界面、类型格式、Rust 与 Node 测试通过。依据 EVIDENCE-044。
 - [x] 核对公开仓库边界，推送并在 GitHub 执行完整检查；修复 PR 专用 status 在 push 上的失败，主分支全量通过。依据 EVIDENCE-044。
 - [x] 核对 Semifold 实际生成的 release PR、0.1.0 manifest 及两条全量预览检查，全部通过；未合并、未实际发布。依据 EVIDENCE-044。
-- [ ] 配置有根包及四个平台包权限的 NPM_TOKEN，并在明确发布授权下验收 registry 首次发布及 provenance；当前没有发布 secret。依据 EVIDENCE-044。
+- [x] 发布认证已按后续决定迁移为 npm 可信发布，不再要求配置 NPM_TOKEN；0.2.1 的五包 OIDC 实际发布与 provenance 已验收，权限收尾由本页“npm 可信发布迁移”跟踪。依据 EVIDENCE-044。
 
 - [x] 用户确认 Windows x64 MSVC、macOS arm64/x64、Linux x64 GNU/glibc 四目标范围；只读核对当前 Mac 的本地归档安装、原生 arm64 加载及运行时签名边界，不覆盖安装。依据 EVIDENCE-043。
 - [x] 扩展四目标声明，补齐原生矩阵构建、打包加载与官方完整产物收集，保留 napi-rs 与 Semifold 职责；本地静态验证通过，已记录 changeset。依据 EVIDENCE-043。
@@ -128,7 +128,7 @@
 - [x] 实现 DSH 消息、工具调用、流块及重放资料转换；合成验证依据 EVIDENCE-007。
 - [x] 用户确认真实图片对话、提前停止及输入后恢复正常，依据 EVIDENCE-019、EVIDENCE-020。
 - [ ] 验证持续背压、提前结束后的原生资源释放和卸载取消。
-- [ ] 完成 Semifold 单 npm 发布单元与 napi-rs 平台包的真实首次发布、provenance 及安装验收；自动化配置、版本同步与发布前 CI 已通过，依据 EVIDENCE-044。
+- [ ] 完成已发布产物的目标 DSH 安装验收；Semifold 与 napi-rs 的五包实际发布、0.2.1 OIDC 及 provenance 已验证，不将发布成功替代安装与桌面验收，依据 EVIDENCE-044。
 - [ ] 实现确定范围内的 Rust 核心与 JS 适配，完成针对性验证与真实宿主集成。
 - [x] 按用户授权备份旧 Codex 凭据、桌面配置及旧安装包，并核对备份内容；不记录敏感数据。
 - [x] 生成 DSH 本地插件产物，完成独立宿主预检，替换旧插件；依据 EVIDENCE-007。

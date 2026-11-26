@@ -210,7 +210,7 @@ Semifold 管理 changeset、根 npm 版本、release PR 和发布编排。一个
 
 可信关系通过 npm trust 配置，账号必须有对应包写权限并完成 2FA；配置成功不代替首次发布验收。新配置在官方有效期内完成五包的首次 OIDC 发布后，再禁用这些包的传统 token 发布并删除仓库 NPM_TOKEN secret；不撤销可能被其他项目共享的账号 token，也不改变 GitHub 自动生成的工作流 token。失败时保留可追溯状态，不重复发布已有版本，不以本机 dry-run 声称 OIDC 已验收。
 
-GitHub 权限分离：质量与原生 job 只读，Semifold job 仅持有创建 release 分支、PR、Release 和 provenance 所需权限。由 Actions token 创建 release PR 后，显式 dispatch 同一 CI 到 release 分支，避免依赖 token push 自动触发检查；dispatch 验证不进入真实发布 job。本次以真实 GitHub 运行结果验收质量与版本 PR 路线，npm 初次发布认证及实际 provenance 验收另行跟踪。仓库按用户要求公开，保留现有 --provenance 参数，不通过降低校验掩盖私有源仓库限制。来源、版本与限制由 EVIDENCE-044 维护。
+GitHub 权限分离：质量与原生 job 只读，Semifold job 仅持有创建 release 分支、PR、Release 和 provenance 所需权限。由 Actions token 创建 release PR 后，显式 dispatch 同一 CI 到 release 分支，避免依赖 token push 自动触发检查；dispatch 验证不进入真实发布 job。以真实 GitHub 运行和五包 registry 来源证明分别验收质量、版本 PR 与可信发布，不以成功构建替代实际发包。仓库按用户要求公开，保留现有 --provenance 参数，不通过降低校验掩盖私有源仓库限制。来源、版本与限制由 EVIDENCE-044 维护。
 
 纯 Agent 上下文修改不创建 changeset。产品成果附 changeset 和本地提交；版本更新和发布仍由 Semifold 编排，不手工消费 changeset。可信发布迁移按 RFC-001 的专项授权完成 patch 发布验收，其余未授权发布不自动执行。配置实施及实际发布验证由 TODO-001 跟踪。
 

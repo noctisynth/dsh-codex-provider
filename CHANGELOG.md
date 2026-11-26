@@ -1,5 +1,13 @@
 # Changelog
 
+<!-- semifold:release version=0.2.1 -->
+## v0.2.1
+
+### Chores
+
+- [`ffdd164`](https://github.com/noctisynth/dsh-codex-provider/commit/ffdd164a597147674fc35fd5417f910d41854f67): Publish the root package and all four native platform packages through GitHub Actions OIDC trusted publishing instead of a long-lived npm token, retaining provenance and the existing Semifold and napi-rs release flow.
+<!-- semifold:release:end -->
+
 <!-- semifold:release version=0.2.0 -->
 ## v0.2.0
 

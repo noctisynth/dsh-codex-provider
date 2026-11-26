@@ -2,6 +2,11 @@
 
 编号：TODO-001。更新：2026-11-16。依据：RFC-001、SPEC-001、RFC-002、SPEC-002。
 
+## npm 可信发布迁移（2026-11-26）
+
+- [ ] 为根包及四个平台包配置 GitHub Actions 可信发布；CI 不再注入 npm token，保留 Semifold、napi-rs 和 provenance。依据 RFC-001、SPEC-001、EVIDENCE-044。
+- [ ] 完成全量 CI、Semifold patch 发布和五包 OIDC/provenance 验收；成功后禁用传统 token 发布并清理仓库发布 secret。原有本地工作保持不变。
+
 ## 模型请求代理
 
 - [x] 实现 RFC-001、SPEC-001 的模型请求代理，完成两条路线、代理失败不回退、配置持久化与清空的离线集成验证；本机打包与未验证范围见 EVIDENCE-058。

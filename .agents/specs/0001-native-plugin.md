@@ -206,11 +206,13 @@ Semifold 管理 changeset、根 npm 版本、release PR 和发布编排。一个
 
 根 npm 名称改为 dsh-chatgpt-rs，平台 npm 名称由官方 napi-rs 按根名派生；原生 binaryName、Rust crate、内部凭据键及业务标识保持不变。Semifold 的稳定 PackageId 保留，既有 changeset 不手工消费；registry 查询及发布使用 manifest 的实际名称。元数据指向真实公开仓库，不另行改 GitHub 仓库名。
 
-固定 Semifold 0.3.5，使用维护方 setup action 的已核对 commit。顶层 main push 且所有检查通过后，在独立最小写权限 job 先运行 ci --dry-run，以 Semifold 自身的 JSON outputs 判断版本或发布分支，不解析提交文案。存在 changeset 时由 ci 创建或更新 release PR；无 changeset 时才装配同一 run、同一提交的完整原生产物，配置 npm 认证后由 ci 发布。npm 认证仅注入真实发布步骤，GitHub Release 仍由 Semifold 负责，napi-rs 禁用自己的 GitHub Release；根包及四个平台包均需要对应的发布权限。
+固定 Semifold 0.3.5，使用维护方 setup action 的已核对 commit。顶层 main push 且所有检查通过后，在独立最小写权限 job 先运行 ci --dry-run，以 Semifold 自身的 JSON outputs 判断版本或发布分支，不解析提交文案。存在 changeset 时由 ci 创建或更新 release PR；无 changeset 时才装配同一 run、同一提交的完整原生产物，由 ci 发布。根包及四个平台包分别信任 noctisynth/dsh-codex-provider 的 CI 发布入口，允许直接发布；GitHub 托管 runner 通过 job 级 id-token: write 提供 OIDC 身份，npm 自动交换短期凭据，不注入长期 npm token，也不在失败时回退到 token。发布前检查公开源仓库与 OIDC 环境，保留 provenance；GitHub Release 仍由 Semifold 负责，napi-rs 禁用自己的 GitHub Release。发布沿用 Node 24.11.0 随附的 npm 11.6.1，已满足 OIDC 发布要求；管理可信关系单独使用 npm 11.21.3，不升级项目依赖。
+
+可信关系通过 npm trust 配置，账号必须有对应包写权限并完成 2FA；配置成功不代替首次发布验收。新配置在官方有效期内完成五包的首次 OIDC 发布后，再禁用这些包的传统 token 发布并删除仓库 NPM_TOKEN secret；不撤销可能被其他项目共享的账号 token，也不改变 GitHub 自动生成的工作流 token。失败时保留可追溯状态，不重复发布已有版本，不以本机 dry-run 声称 OIDC 已验收。
 
 GitHub 权限分离：质量与原生 job 只读，Semifold job 仅持有创建 release 分支、PR、Release 和 provenance 所需权限。由 Actions token 创建 release PR 后，显式 dispatch 同一 CI 到 release 分支，避免依赖 token push 自动触发检查；dispatch 验证不进入真实发布 job。本次以真实 GitHub 运行结果验收质量与版本 PR 路线，npm 初次发布认证及实际 provenance 验收另行跟踪。仓库按用户要求公开，保留现有 --provenance 参数，不通过降低校验掩盖私有源仓库限制。来源、版本与限制由 EVIDENCE-044 维护。
 
-纯 Agent 上下文修改不创建 changeset。产品成果附 changeset 和本地提交；此次允许推送 CI 配置并验证，但不为测试而手工更新版本、合并 release PR 或实际发包。配置实施及实际发布验证由 TODO-001 跟踪。
+纯 Agent 上下文修改不创建 changeset。产品成果附 changeset 和本地提交；版本更新和发布仍由 Semifold 编排，不手工消费 changeset。可信发布迁移按 RFC-001 的专项授权完成 patch 发布验收，其余未授权发布不自动执行。配置实施及实际发布验证由 TODO-001 跟踪。
 
 ## 验证尺度
 

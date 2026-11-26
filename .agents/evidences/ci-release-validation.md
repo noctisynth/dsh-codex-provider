@@ -1,6 +1,6 @@
 # 质量检查与 Semifold 发布自动化验证
 
-编号：EVIDENCE-044。日期：2026-11-11。范围：用户确认的分发身份、公开仓库、质量及四目标 CI、Semifold 版本 PR 和发布依赖链。本次不合并 release PR、不实际发布 npm 或 GitHub Release，不读取登录凭据，不覆盖活动插件。
+编号：EVIDENCE-044。初始日期：2026-11-11。范围：分发身份、公开仓库、质量及四目标 CI、Semifold 版本 PR 和发布依赖链。初始验证不包含实际发布；2026-11-26 的可信发布迁移及专项发布验收单列记录，不覆盖活动插件。
 
 ## 已确认事项与观察
 
@@ -39,3 +39,21 @@
 release 分支显式 dispatch 验证：https://github.com/noctisynth/dsh-codex-provider/actions/runs/42999714358 。另一个 PR 事件验证因 GitHub 的 bot PR 安全策略显示 action_required，已在核对其代码范围后批准本次工作流执行，而非批准或合并 PR：https://github.com/noctisynth/dsh-codex-provider/actions/runs/42999716658 。两条运行最终均为 success：版本规划、四个原生目标、完整包集合和汇总全部通过；release job 在非 main push 上按设计跳过，没有递归发包。此处验证的是 Semifold 生成的 0.1.0 分支，未把 workflow dispatch 已受理当作检查成功。
 
 核对时仓库仍未配置 NPM_TOKEN，GitHub Releases 列表为空；主运行中所有 npm 发布准备及真实发布步骤均为 skipped，只执行版本 PR 路线。实际首次发布、平台包与根包 registry 权限和 provenance 尚未验收。
+
+## npm 可信发布迁移（2026-11-26）
+
+### 官方依据与实施边界
+
+- 观察：迁移开始时公开 registry 的根包及四个平台包均已发布 0.2.0；远端主分支已包含该版本。迁移以远端版本为基线，原工作区的未提交业务与方案内容不参与发布。
+- 官方 npm trust 要求 npm 11.15.0 及以上、对应包写权限和账号级 2FA；不接受 bypass-2FA granular token 管理可信关系。此次使用隔离的 npm 11.21.3 管理配置，不升级项目依赖。来源：https://docs.npmjs.com/cli/v11/commands/npm-trust
+- 发布 OIDC 最低 npm 11.5.1、Node 22.14.0，现有 Node 24.11.0 随附 npm 11.6.1 满足要求。新可信配置的首次成功发布须在 2 天内完成；配置保存不验证实际工作流匹配。来源：https://docs.npmjs.com/trusted-publishers/ ，https://raw.githubusercontent.com/nodejs/node/v24.11.0/deps/npm/package.json
+- 配置目标为五个包分别绑定 noctisynth/dsh-codex-provider 的 CI 工作流；仅允许直接发布，不增加 dist-tag 或 staged publish 权限。发布 job 没有 GitHub Environment，不配置虚构环境名；保留 job 级 OIDC 权限和 GitHub 自动生成的工作流 token。
+- 源码核对：napi-rs 3.10.12 的 npmClient 默认为 npm；平台发布通过子进程 npm publish 并继承环境，无 whoami 或 npm token 必填前置检查。因此保持原有 Semifold → npm lifecycle → napi-rs 平台包发布流程，不自造发布循环。来源：https://github.com/napi-rs/napi-rs/blob/cli%403.10.12/cli/src/api/pre-publish.ts ，https://github.com/napi-rs/napi-rs/blob/cli%403.10.12/cli/src/utils/config.ts
+- CI 移除 npm token 注入和必填门禁，保留公开仓库检查、provenance 与完整质量依赖；增加 OIDC 环境存在性检查，不打印身份 token。首次五包 OIDC 发布成功后，再按 npm 官方建议禁用传统 token 发布并删除仓库 NPM_TOKEN secret；不扩大到撤销可能被其他项目使用的账号 token。
+
+### 本地验证
+
+- CI YAML 解析和全部 shell 脚本语法通过；确认发布仍只在 main push、全量检查成功后执行，Semifold 及 provenance 未变。
+- 四个合成门禁场景通过：公开仓库且 OIDC 信息完整时允许；私有源、缺请求 URL 或缺请求 token 时拒绝。没有真实凭据或远端发布副作用。
+- Semifold 0.3.4 只读计划确认新增 patch changeset 将 0.2.0 升为 0.2.1，未手工更新版本、消费变更集或发布。差异空白检查通过。
+- 可信关系配置、远程全量检查、实际五包发布与禁用 token 的结果以随后真实验收为准；上述离线结果不能替代 OIDC 发布成功。
